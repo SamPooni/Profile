@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyRaft — Distributed Consensus Documentation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@200;300;400;500;600;700&family=SF+Pro+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.72);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            --glass-blur: 20px;
+            --accent-blue: #0071e3;
+            --accent-purple: #af52de;
+            --accent-teal: #5ac8fa;
+            --accent-green: #34c759;
+            --accent-orange: #ff9500;
+            --accent-red: #ff3b30;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --bg-gradient-1: #667eea;
+            --bg-gradient-2: #764ba2;
+            --bg-gradient-3: #f093fb;
+            --bg-gradient-4: #f5576c;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 50%, #1a1a2e 75%, #16213e 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 20s ease infinite;
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        /* Animated Background Orbs */
+        .bg-orbs {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            top: -200px;
+            left: -100px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: linear-gradient(135deg, #5ac8fa, #34c759);
+            top: 50%;
+            right: -150px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: linear-gradient(135deg, #ff9500, #ff3b30);
+            bottom: -100px;
+            left: 30%;
+            animation-delay: -10s;
+        }
+
+        .orb-4 {
+            width: 350px;
+            height: 350px;
+            background: linear-gradient(135deg, #af52de, #5ac8fa);
+            top: 40%;
+            left: 10%;
+            animation-delay: -15s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(50px, -50px) scale(1.1); }
+            50% { transform: translate(-30px, 30px) scale(0.95); }
+            75% { transform: translate(-50px, -30px) scale(1.05); }
+        }
+
+        /* Glass Card Styles */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .glass-dark {
+            background: rgba(30, 30, 40, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            padding: 12px 28px;
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .nav a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            transition: all 0.3s ease;
+        }
+
+        .nav a:hover {
+            color: #fff;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .nav-logo {
+            font-weight: 600;
+            font-size: 18px !important;
+            background: linear-gradient(135deg, #fff, #5ac8fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 40px;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 120px 20px 80px;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 32px;
+            animation: fadeInUp 1s ease 0.2s both;
+        }
+
+        .hero-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+        }
+
+        .hero h1 {
+            font-size: clamp(48px, 10vw, 96px);
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            line-height: 1.05;
+            color: #fff;
+            margin-bottom: 24px;
+            animation: fadeInUp 1s ease 0.4s both;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #5ac8fa 0%, #af52de 50%, #ff9500 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(18px, 2.5vw, 24px);
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 700px;
+            margin-bottom: 48px;
+            letter-spacing: -0.01em;
+            animation: fadeInUp 1s ease 0.6s both;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            animation: fadeInUp 1s ease 0.8s both;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 32px;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), #00a3ff);
+            color: #fff;
+            box-shadow: 0 4px 24px rgba(0, 113, 227, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 113, 227, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Section Styles */
+        section {
+            padding: 120px 0;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .section-label {
+            display: inline-block;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-blue);
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: clamp(36px, 5vw, 56px);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+
+        .section-description {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.65);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Architecture Grid */
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 24px;
+            margin-top: 60px;
+        }
+
+        .arch-card {
+            padding: 40px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .arch-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .arch-card:hover::before {
+            opacity: 1;
+        }
+
+        .arch-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+        }
+
+        .arch-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 24px;
+        }
+
+        .arch-icon.blue { background: linear-gradient(135deg, rgba(90, 200, 250, 0.2), rgba(0, 113, 227, 0.2)); }
+        .arch-icon.purple { background: linear-gradient(135deg, rgba(175, 82, 222, 0.2), rgba(102, 126, 234, 0.2)); }
+        .arch-icon.green { background: linear-gradient(135deg, rgba(52, 199, 89, 0.2), rgba(90, 200, 250, 0.2)); }
+        .arch-icon.orange { background: linear-gradient(135deg, rgba(255, 149, 0, 0.2), rgba(255, 59, 48, 0.2)); }
+
+        .arch-card h3 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .arch-card p {
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.65);
+            line-height: 1.7;
+        }
+
+        /* State Machine Visualization */
+        .state-machine {
+            padding: 60px;
+            margin-top: 60px;
+        }
+
+        .state-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+
+        .state-node {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.4s ease;
+            cursor: pointer;
+        }
+
+        .state-node:hover {
+            transform: scale(1.08);
+        }
+
+        .state-follower {
+            background: linear-gradient(135deg, rgba(90, 200, 250, 0.3), rgba(90, 200, 250, 0.1));
+            border: 2px solid rgba(90, 200, 250, 0.5);
+            box-shadow: 0 0 60px rgba(90, 200, 250, 0.2);
+        }
+
+        .state-candidate {
+            background: linear-gradient(135deg, rgba(255, 149, 0, 0.3), rgba(255, 149, 0, 0.1));
+            border: 2px solid rgba(255, 149, 0, 0.5);
+            box-shadow: 0 0 60px rgba(255, 149, 0, 0.2);
+        }
+
+        .state-leader {
+            background: linear-gradient(135deg, rgba(52, 199, 89, 0.3), rgba(52, 199, 89, 0.1));
+            border: 2px solid rgba(52, 199, 89, 0.5);
+            box-shadow: 0 0 60px rgba(52, 199, 89, 0.2);
+        }
+
+        .state-node h4 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .state-node span {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .state-arrow {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 32px;
+            position: relative;
+        }
+
+        .state-arrow::after {
+            content: attr(data-label);
+            position: absolute;
+            bottom: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            white-space: nowrap;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Code Block Styles */
+        .code-section {
+            margin-top: 60px;
+        }
+
+        .code-block {
+            padding: 32px;
+            border-radius: 20px;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .code-title {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .code-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .code-dots span {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .code-dots span:nth-child(1) { background: #ff5f57; }
+        .code-dots span:nth-child(2) { background: #febc2e; }
+        .code-dots span:nth-child(3) { background: #28c840; }
+
+        .code-content {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .code-content .keyword { color: #ff7b72; }
+        .code-content .function { color: #d2a8ff; }
+        .code-content .string { color: #a5d6ff; }
+        .code-content .comment { color: rgba(255, 255, 255, 0.4); }
+        .code-content .class { color: #7ee787; }
+        .code-content .number { color: #79c0ff; }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            margin-top: 60px;
+            padding-left: 40px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--accent-blue), var(--accent-purple), var(--accent-green));
+        }
+
+        .timeline-item {
+            position: relative;
+            padding: 32px 40px;
+            margin-bottom: 24px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -36px;
+            top: 40px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            border: 3px solid rgba(30, 30, 40, 0.9);
+            box-shadow: 0 0 20px var(--accent-blue);
+        }
+
+        .timeline-item:nth-child(2)::before { background: var(--accent-purple); box-shadow: 0 0 20px var(--accent-purple); }
+        .timeline-item:nth-child(3)::before { background: var(--accent-green); box-shadow: 0 0 20px var(--accent-green); }
+        .timeline-item:nth-child(4)::before { background: var(--accent-orange); box-shadow: 0 0 20px var(--accent-orange); }
+
+        .timeline-item h4 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .timeline-item p {
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        /* Message Flow Diagram */
+        .message-flow {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+            margin-top: 60px;
+        }
+
+        .flow-node {
+            text-align: center;
+            padding: 40px 24px;
+        }
+
+        .flow-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 36px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .flow-node h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+
+        .flow-node p {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.6;
+        }
+
+        /* API Reference Cards */
+        .api-grid {
+            display: grid;
+            gap: 24px;
+            margin-top: 60px;
+        }
+
+        .api-card {
+            padding: 32px;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 32px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .api-card {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .api-method {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .api-method-badge {
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .badge-get { background: rgba(52, 199, 89, 0.2); color: #34c759; }
+        .badge-post { background: rgba(0, 113, 227, 0.2); color: #0071e3; }
+        .badge-class { background: rgba(175, 82, 222, 0.2); color: #af52de; }
+
+        .api-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .api-description {
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .api-params {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .api-param {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .api-param code {
+            color: var(--accent-teal);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .api-param span {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Log Visualization */
+        .log-viz {
+            margin-top: 60px;
+            padding: 40px;
+            overflow-x: auto;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .log-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .log-legend {
+            display: flex;
+            gap: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 4px;
+        }
+
+        .legend-dot.term-1 { background: var(--accent-blue); }
+        .legend-dot.term-2 { background: var(--accent-purple); }
+        .legend-dot.term-3 { background: var(--accent-green); }
+        .legend-dot.committed { background: var(--accent-orange); }
+
+        .log-entries {
+            display: flex;
+            gap: 8px;
+            padding: 20px 0;
+        }
+
+        .log-entry {
+            min-width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .log-entry:hover {
+            transform: translateY(-4px) scale(1.05);
+        }
+
+        .log-entry.term-1 { 
+            background: linear-gradient(135deg, rgba(0, 113, 227, 0.3), rgba(0, 113, 227, 0.1));
+            border: 1px solid rgba(0, 113, 227, 0.4);
+            color: var(--accent-blue);
+        }
+
+        .log-entry.term-2 { 
+            background: linear-gradient(135deg, rgba(175, 82, 222, 0.3), rgba(175, 82, 222, 0.1));
+            border: 1px solid rgba(175, 82, 222, 0.4);
+            color: var(--accent-purple);
+        }
+
+        .log-entry.term-3 { 
+            background: linear-gradient(135deg, rgba(52, 199, 89, 0.3), rgba(52, 199, 89, 0.1));
+            border: 1px solid rgba(52, 199, 89, 0.4);
+            color: var(--accent-green);
+        }
+
+        .log-entry .index {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-bottom: 4px;
+        }
+
+        .log-entry .value {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .log-entry .term {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+            margin-top: 60px;
+        }
+
+        .stat-card {
+            padding: 32px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, rgba(255, 255, 255, 0.7));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* Footer */
+        footer {
+            padding: 80px 0;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 80px;
+        }
+
+        .footer-logo {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, #5ac8fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+        }
+
+        .footer-text {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 32px;
+            justify-content: center;
+            margin-top: 24px;
+        }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: #fff;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav {
+                gap: 16px;
+                padding: 10px 20px;
+            }
+            
+            .nav a:not(.nav-logo) {
+                display: none;
+            }
+
+            .container {
+                padding: 0 20px;
+            }
+
+            section {
+                padding: 80px 0;
+            }
+
+            .state-diagram {
+                flex-direction: column;
+            }
+
+            .message-flow {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Scroll Animations */
+        .reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Table of Contents Sidebar */
+        .toc-sidebar {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toc-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toc-dot:hover,
+        .toc-dot.active {
+            background: #fff;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+            transform: scale(1.3);
+        }
+
+        @media (max-width: 1200px) {
+            .toc-sidebar {
+                display: none;
+            }
+        }
+
+        /* Animated underline for links */
+        .animated-link {
+            position: relative;
+            display: inline-block;
+        }
+
+        .animated-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -4px;
+            left: 0;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            transition: width 0.3s ease;
+        }
+
+        .animated-link:hover::after {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Orbs -->
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="orb orb-4"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav glass glass-dark">
+        <a href="#" class="nav-logo">PyRaft</a>
+        <a href="#overview">Overview</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#consensus">Consensus</a>
+        <a href="#api">API Reference</a>
+        <a href="#simulation">Simulation</a>
+        <a href="#research">Research</a>
+    </nav>
+
+    <!-- Table of Contents Sidebar -->
+    <div class="toc-sidebar">
+        <div class="toc-dot active" data-section="hero"></div>
+        <div class="toc-dot" data-section="overview"></div>
+        <div class="toc-dot" data-section="architecture"></div>
+        <div class="toc-dot" data-section="consensus"></div>
+        <div class="toc-dot" data-section="api"></div>
+        <div class="toc-dot" data-section="simulation"></div>
+        <div class="toc-dot" data-section="research"></div>
+    </div>
+
+    <!-- Hero Section -->
+    <header class="hero" id="hero">
+        <div class="container">
+            <div class="hero-badge glass glass-dark">
+                <span>Distributed Systems</span>
+            </div>
+            <h1>The <span>Raft</span> Consensus Algorithm</h1>
+            <p class="hero-subtitle">A comprehensive Python implementation of the Raft distributed consensus protocol — designed for understandability without sacrificing correctness.</p>
+            <div class="hero-buttons">
+                <a href="#architecture" class="btn btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    Explore Architecture
+                </a>
+                <a href="#api" class="btn btn-secondary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14,2 14,8 20,8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    API Reference
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Overview Section -->
+    <section id="overview">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-label">Introduction</span>
+                <h2 class="section-title">What is Raft?</h2>
+                <p class="section-description">Raft is a consensus algorithm designed to be easy to understand while providing strong consistency guarantees for distributed systems.</p>
+            </div>
+
+            <div class="stats-grid reveal">
+                <div class="stat-card glass glass-dark">
+                    <div class="stat-value">3-7</div>
+                    <div class="stat-label">Typical Nodes</div>
+                </div>
+                <div class="stat-card glass glass-dark">
+                    <div class="stat-value">F+1</div>
+                    <div class="stat-label">Fault Tolerance</div>
+                </div>
+                <div class="stat-card glass glass-dark">
+                    <div class="stat-value">O(n)</div>
+                    <div class="stat-label">Message Complexity</div>
+                </div>
+                <div class="stat-card glass glass-dark">
+                    <div class="stat-value">100%</div>
+                    <div class="stat-label">Strong Consistency</div>
+                </div>
+            </div>
+
+            <div class="timeline reveal">
+                <div class="timeline-item glass glass-dark">
+                    <h4>Leader Election</h4>
+                    <p>When a cluster starts or the leader fails, nodes hold an election. Candidates request votes from peers, and a node becomes leader upon receiving a majority. Elections use randomized timeouts to prevent split votes.</p>
+                </div>
+                <div class="timeline-item glass glass-dark">
+                    <h4>Log Replication</h4>
+                    <p>The leader accepts client requests, appends them to its log, and replicates entries to followers. Each entry includes a term number and command. Followers acknowledge receipt, enabling the leader to track consensus.</p>
+                </div>
+                <div class="timeline-item glass glass-dark">
+                    <h4>Commitment</h4>
+                    <p>Once an entry is replicated on a majority of servers, it's considered committed. The leader tracks the highest committed index and includes it in AppendEntries messages so followers can apply committed entries.</p>
+                </div>
+                <div class="timeline-item glass glass-dark">
+                    <h4>State Machine Application</h4>
+                    <p>Committed entries are applied to the state machine in log order. This ensures all servers execute the same commands in the same order, maintaining consistency across the distributed system.</p>
+                </div>
+            </div>
+
+            <!-- Research Application Callout -->
+            <a href="research.html#compilers" target="_blank" class="glass glass-dark reveal" style="display: block; margin-top: 40px; padding: 28px 32px; text-decoration: none; border-left: 4px solid var(--accent-purple); transition: all 0.3s ease;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, rgba(175, 82, 222, 0.3), rgba(102, 126, 234, 0.2)); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <span style="font-size: 24px;">🔬</span>
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin-bottom: 4px;">Applied Research: Distributed Parameter Server</h4>
+                        <p style="color: rgba(255,255,255,0.6); font-size: 14px; margin: 0;">See how Raft consensus enables fault-tolerant distributed ML with 40%+ throughput gains in federated learning.</p>
+                    </div>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2" style="flex-shrink: 0;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                    </svg>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-label">System Design</span>
+                <h2 class="section-title">Architecture Overview</h2>
+                <p class="section-description">PyRaft implements a clean separation of concerns with distinct layers for networking, consensus logic, and state management.</p>
+            </div>
+
+            <div class="arch-grid reveal">
+                <div class="arch-card glass glass-dark">
+                    <div class="arch-icon blue">🌐</div>
+                    <h3>RaftNet Layer</h3>
+                    <p>Handles all network communication between nodes using TCP sockets. Provides abstract send/receive operations with separate queues for each peer. Supports both real TCP connections and mock networks for testing.</p>
+                </div>
+                <div class="arch-card glass glass-dark">
+                    <div class="arch-icon purple">📝</div>
+                    <h3>RaftLog Module</h3>
+                    <p>Implements the replicated transaction log with the append_entries operation. Enforces log matching properties, handles idempotent operations, and maintains strict ordering guarantees.</p>
+                </div>
+                <div class="arch-card glass glass-dark">
+                    <div class="arch-icon green">🔄</div>
+                    <h3>RaftServer State Machine</h3>
+                    <p>Core consensus logic implementing the three-state machine: Follower, Candidate, and Leader. Handles all Raft RPCs including RequestVote, AppendEntries, and their responses.</p>
+                </div>
+                <div class="arch-card glass glass-dark">
+                    <div class="arch-icon orange">🎮</div>
+                    <h3>RaftControl Runtime</h3>
+                    <p>Bridges the Raft algorithm with the execution environment. Manages timers, event queues, message dispatch, and state machine application. Enables both threaded execution and simulation.</p>
+                </div>
+            </div>
+
+            <!-- State Machine Visualization -->
+            <div class="state-machine glass glass-dark reveal">
+                <h3 style="color: #fff; font-size: 24px; font-weight: 600; margin-bottom: 12px; text-align: center;">Server State Transitions</h3>
+                <p style="color: rgba(255,255,255,0.6); text-align: center; margin-bottom: 20px;">Each server in a Raft cluster is always in one of three states</p>
+                
+                <div class="state-diagram">
+                    <div class="state-node state-follower">
+                        <h4>Follower</h4>
+                        <span>Passive state, responds to RPCs</span>
+                    </div>
+                    
+                    <div class="state-arrow" data-label="Election timeout">→</div>
+                    
+                    <div class="state-node state-candidate">
+                        <h4>Candidate</h4>
+                        <span>Requests votes from peers</span>
+                    </div>
+                    
+                    <div class="state-arrow" data-label="Receives majority">→</div>
+                    
+                    <div class="state-node state-leader">
+                        <h4>Leader</h4>
+                        <span>Handles all client requests</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 40px; padding: 24px; background: rgba(255,255,255,0.05); border-radius: 16px;">
+                    <h4 style="color: #fff; font-size: 16px; margin-bottom: 16px;">Transition Rules</h4>
+                    <div style="display: grid; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.7); font-size: 14px;">
+                            <span style="color: var(--accent-teal);">●</span>
+                            <span><strong style="color: #fff;">Follower → Candidate:</strong> Election timeout without hearing from leader</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.7); font-size: 14px;">
+                            <span style="color: var(--accent-orange);">●</span>
+                            <span><strong style="color: #fff;">Candidate → Leader:</strong> Receives votes from majority of servers</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.7); font-size: 14px;">
+                            <span style="color: var(--accent-green);">●</span>
+                            <span><strong style="color: #fff;">Any → Follower:</strong> Discovers higher term from any message</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Consensus Section -->
+    <section id="consensus">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-label">Core Algorithm</span>
+                <h2 class="section-title">Consensus Mechanism</h2>
+                <p class="section-description">Understanding how Raft achieves distributed consensus through leader election and log replication.</p>
+            </div>
+
+            <!-- Message Flow -->
+            <div class="message-flow reveal">
+                <div class="flow-node glass glass-dark">
+                    <div class="flow-icon">📨</div>
+                    <h4>AppendEntries</h4>
+                    <p>Leader sends log entries to followers. Also serves as heartbeat when entries list is empty. Contains term, prev_index, prev_term, entries, and commit_index.</p>
+                </div>
+                <div class="flow-node glass glass-dark">
+                    <div class="flow-icon">✅</div>
+                    <h4>AppendEntriesResponse</h4>
+                    <p>Followers respond with success/failure and their match_index. Failed responses trigger leader to retry with earlier entries to find consistency point.</p>
+                </div>
+                <div class="flow-node glass glass-dark">
+                    <div class="flow-icon">🗳️</div>
+                    <h4>RequestVote</h4>
+                    <p>Candidates request votes during elections. Contains term, last_log_index, and last_log_term to verify candidate's log is up-to-date.</p>
+                </div>
+            </div>
+
+            <!-- Log Visualization -->
+            <div class="log-viz glass glass-dark reveal">
+                <div class="log-header">
+                    <div class="log-title">Replicated Log Example</div>
+                    <div class="log-legend">
+                        <div class="legend-item">
+                            <div class="legend-dot term-1"></div>
+                            <span>Term 1</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot term-2"></div>
+                            <span>Term 2</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot term-3"></div>
+                            <span>Term 3</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 16px; color: rgba(255,255,255,0.6); font-size: 13px;">Leader Log</div>
+                <div class="log-entries">
+                    <div class="log-entry term-1">
+                        <div class="index">[0]</div>
+                        <div class="value">x←3</div>
+                        <div class="term">T1</div>
+                    </div>
+                    <div class="log-entry term-1">
+                        <div class="index">[1]</div>
+                        <div class="value">y←1</div>
+                        <div class="term">T1</div>
+                    </div>
+                    <div class="log-entry term-1">
+                        <div class="index">[2]</div>
+                        <div class="value">y←9</div>
+                        <div class="term">T1</div>
+                    </div>
+                    <div class="log-entry term-2">
+                        <div class="index">[3]</div>
+                        <div class="value">x←2</div>
+                        <div class="term">T2</div>
+                    </div>
+                    <div class="log-entry term-3">
+                        <div class="index">[4]</div>
+                        <div class="value">x←0</div>
+                        <div class="term">T3</div>
+                    </div>
+                    <div class="log-entry term-3">
+                        <div class="index">[5]</div>
+                        <div class="value">y←7</div>
+                        <div class="term">T3</div>
+                    </div>
+                    <div class="log-entry term-3">
+                        <div class="index">[6]</div>
+                        <div class="value">x←5</div>
+                        <div class="term">T3</div>
+                    </div>
+                    <div class="log-entry term-3">
+                        <div class="index">[7]</div>
+                        <div class="value">x←4</div>
+                        <div class="term">T3</div>
+                    </div>
+                </div>
+
+                <div style="margin: 24px 0 16px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div style="display: grid; grid-template-columns: 100px 1fr; gap: 16px; align-items: start;">
+                        <div style="color: rgba(255,255,255,0.6); font-size: 13px;">commit_index</div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 24px; height: 24px; background: var(--accent-green); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; font-weight: 600;">5</div>
+                            <span style="color: rgba(255,255,255,0.5); font-size: 13px;">Entries 0-5 committed on majority</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Code Block -->
+            <div class="code-section reveal">
+                <div class="code-block glass glass-dark">
+                    <div class="code-header">
+                        <span class="code-title">raftlog.py — Log Entry Append Operation</span>
+                        <div class="code-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                    <pre class="code-content"><span class="keyword">def</span> <span class="function">append_entries</span>(log, prev_index, prev_term, entries) -> <span class="class">bool</span>:
+    <span class="string">'''
+    Append entries into the Raft log. Return True if it worked, False otherwise.
+    Implements the log matching properties as described in Section 5.3.
+    '''</span>
+    <span class="comment"># The log is never allowed to have holes</span>
+    <span class="keyword">if</span> prev_index >= <span class="function">len</span>(log):
+        <span class="keyword">return</span> <span class="class">False</span>
+
+    <span class="comment"># Check log matching property - term must match</span>
+    <span class="keyword">if</span> prev_index >= <span class="number">0</span> <span class="keyword">and</span> log[prev_index].term != prev_term:
+        <span class="keyword">return</span> <span class="class">False</span>
+
+    <span class="comment"># Append is valid - replace entries from prev_index+1 onwards</span>
+    log[prev_index+<span class="number">1</span>:] = entries
+    <span class="keyword">return</span> <span class="class">True</span></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- API Reference Section -->
+    <section id="api">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-label">Reference</span>
+                <h2 class="section-title">API Documentation</h2>
+                <p class="section-description">Complete reference for all PyRaft classes, methods, and message types.</p>
+            </div>
+
+            <div class="api-grid reveal">
+                <!-- RaftServer -->
+                <div class="api-card glass glass-dark">
+                    <div>
+                        <div class="api-method">
+                            <span class="api-method-badge badge-class">CLASS</span>
+                            <span class="api-name">RaftServer</span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="api-description">Core Raft server implementing the consensus algorithm state machine. Manages log, current term, commit index, and handles all state transitions between Follower, Candidate, and Leader.</p>
+                        <div class="api-params">
+                            <div class="api-param">
+                                <code>state</code>
+                                <span>Current server state (FollowerState, CandidateState, LeaderState)</span>
+                            </div>
+                            <div class="api-param">
+                                <code>log</code>
+                                <span>List of LogEntry objects representing the transaction log</span>
+                            </div>
+                            <div class="api-param">
+                                <code>current_term</code>
+                                <span>Latest term server has seen (persisted)</span>
+                            </div>
+                            <div class="api-param">
+                                <code>commit_index</code>
+                                <span>Index of highest log entry known to be committed</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AppendEntries -->
+                <div class="api-card glass glass-dark">
+                    <div>
+                        <div class="api-method">
+                            <span class="api-method-badge badge-post">MSG</span>
+                            <span class="api-name">AppendEntries</span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="api-description">Invoked by leader to replicate log entries. Also used as heartbeat when entries is empty. Contains all information needed for followers to verify and append entries.</p>
+                        <div class="api-params">
+                            <div class="api-param">
+                                <code>term</code>
+                                <span>Leader's current term</span>
+                            </div>
+                            <div class="api-param">
+                                <code>prev_index</code>
+                                <span>Index of log entry immediately preceding new ones</span>
+                            </div>
+                            <div class="api-param">
+                                <code>prev_term</code>
+                                <span>Term of prev_index entry</span>
+                            </div>
+                            <div class="api-param">
+                                <code>entries</code>
+                                <span>List of LogEntry objects to append (may be empty for heartbeat)</span>
+                            </div>
+                            <div class="api-param">
+                                <code>commit_index</code>
+                                <span>Leader's commit_index</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RequestVote -->
+                <div class="api-card glass glass-dark">
+                    <div>
+                        <div class="api-method">
+                            <span class="api-method-badge badge-post">MSG</span>
+                            <span class="api-name">RequestVote</span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="api-description">Invoked by candidates to gather votes during leader election. Voters only grant vote if candidate's log is at least as up-to-date as their own.</p>
+                        <div class="api-params">
+                            <div class="api-param">
+                                <code>term</code>
+                                <span>Candidate's term</span>
+                            </div>
+                            <div class="api-param">
+                                <code>last_log_index</code>
+                                <span>Index of candidate's last log entry</span>
+                            </div>
+                            <div class="api-param">
+                                <code>last_log_term</code>
+                                <span>Term of candidate's last log entry</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RaftControl -->
+                <div class="api-card glass glass-dark">
+                    <div>
+                        <div class="api-method">
+                            <span class="api-method-badge badge-class">CLASS</span>
+                            <span class="api-name">RaftControl</span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="api-description">Runtime controller bridging Raft algorithm with execution environment. Manages event queues, timers, message dispatch, and provides interface for client operations.</p>
+                        <div class="api-params">
+                            <div class="api-param">
+                                <code>start()</code>
+                                <span>Launch threaded execution environment</span>
+                            </div>
+                            <div class="api-param">
+                                <code>client_append_entry(item)</code>
+                                <span>Submit entry to leader, returns Future</span>
+                            </div>
+                            <div class="api-param">
+                                <code>is_leader()</code>
+                                <span>Check if this node is current leader</span>
+                            </div>
+                            <div class="api-param">
+                                <code>process_event(evt)</code>
+                                <span>Process single event (for simulation)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TCPRaftNet -->
+                <div class="api-card glass glass-dark">
+                    <div>
+                        <div class="api-method">
+                            <span class="api-method-badge badge-class">CLASS</span>
+                            <span class="api-name">TCPRaftNet</span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="api-description">TCP-based network layer for real distributed deployment. Manages separate outgoing queues per peer, handles connection failures gracefully, and provides non-blocking send operations.</p>
+                        <div class="api-params">
+                            <div class="api-param">
+                                <code>send(msg)</code>
+                                <span>Non-blocking send to destination (from msg.dest)</span>
+                            </div>
+                            <div class="api-param">
+                                <code>receive(blocking=True)</code>
+                                <span>Receive next message from any peer</span>
+                            </div>
+                            <div class="api-param">
+                                <code>start()</code>
+                                <span>Launch acceptor and sender threads</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LogEntry -->
+                <div class="api-card glass glass-dark">
+                    <div>
+                        <div class="api-method">
+                            <span class="api-method-badge badge-class">CLASS</span>
+                            <span class="api-name">LogEntry</span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="api-description">Named tuple representing a single entry in the Raft log. Each entry contains the term when it was created and the actual command/item to be applied to the state machine.</p>
+                        <div class="api-params">
+                            <div class="api-param">
+                                <code>term</code>
+                                <span>Term number when entry was created</span>
+                            </div>
+                            <div class="api-param">
+                                <code>item</code>
+                                <span>The actual command/data (any object)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Simulation Section -->
+    <section id="simulation">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-label">Testing</span>
+                <h2 class="section-title">Simulation Framework</h2>
+                <p class="section-description">PyRaft includes a powerful simulation framework for testing consensus scenarios without real network overhead.</p>
+            </div>
+
+            <div class="arch-grid reveal">
+                <div class="arch-card glass glass-dark">
+                    <div class="arch-icon blue">🧪</div>
+                    <h3>MockNetwork</h3>
+                    <p>Simulated network layer using in-memory queues. Messages can be inspected, delayed, or dropped to test failure scenarios. Perfect for unit testing Raft logic in isolation.</p>
+                </div>
+                <div class="arch-card glass glass-dark">
+                    <div class="arch-icon purple">⏱️</div>
+                    <h3>Deterministic Stepping</h3>
+                    <p>The simulation framework allows stepping through message exchanges one at a time. Call step() to process all pending messages, or step_all() to run until quiescence.</p>
+                </div>
+                <div class="arch-card glass glass-dark">
+                    <div class="arch-icon green">📊</div>
+                    <h3>Scenario Testing</h3>
+                    <p>Pre-built test scenarios including Figure 7 (diverse log states) and Figure 8 (commitment safety). Validates correct log replication and commit behavior.</p>
+                </div>
+                <div class="arch-card glass glass-dark">
+                    <div class="arch-icon orange">🔍</div>
+                    <h3>State Inspection</h3>
+                    <p>Full access to server state during simulation. Verify log contents, commit indices, term numbers, and state transitions. Assert invariants at any point.</p>
+                </div>
+            </div>
+
+            <!-- Simulation Code -->
+            <div class="code-section reveal">
+                <div class="code-block glass glass-dark">
+                    <div class="code-header">
+                        <span class="code-title">raftsim.py — Running a Simulation</span>
+                        <div class="code-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                    <pre class="code-content"><span class="keyword">class</span> <span class="class">RaftSimulation</span>:
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, num_nodes):
+        self.nodes = []
+        <span class="keyword">for</span> n <span class="keyword">in</span> <span class="function">range</span>(num_nodes):
+            net = raftnet.<span class="class">MockNetwork</span>(n, [x <span class="keyword">for</span> x <span class="keyword">in</span> <span class="function">range</span>(num_nodes) <span class="keyword">if</span> x != n])
+            self.nodes.append(raftcontrol.<span class="class">RaftControl</span>(net))
+
+    <span class="keyword">def</span> <span class="function">step</span>(self):
+        <span class="string">"""Process all pending messages across all nodes"""</span>
+        messages = []
+        <span class="keyword">for</span> node <span class="keyword">in</span> self.nodes:
+            messages.extend(node.outgoing)
+            node.outgoing.clear()
+        
+        <span class="comment"># Dispatch messages to destination nodes</span>
+        <span class="keyword">for</span> msg <span class="keyword">in</span> messages:
+            self.nodes[msg.dest].process_event(
+                raftcontrol.<span class="class">MessageEvent</span>(msg)
+            )
+        <span class="keyword">return</span> <span class="function">bool</span>(messages)
+
+    <span class="keyword">def</span> <span class="function">step_all</span>(self):
+        <span class="string">"""Run until no more messages pending"""</span>
+        <span class="keyword">while</span> self.step():
+            <span class="keyword">pass</span>
+
+<span class="comment"># Example: Test log replication</span>
+sim = <span class="class">RaftSimulation</span>(<span class="number">5</span>)
+sim.nodes[<span class="number">0</span>].become_leader()
+sim.nodes[<span class="number">0</span>].client_append_entry(<span class="string">'x=1'</span>)
+sim.step_all()
+
+<span class="comment"># Verify all logs match</span>
+<span class="keyword">assert</span> <span class="function">all</span>(n.server.log == sim.nodes[<span class="number">0</span>].server.log <span class="keyword">for</span> n <span class="keyword">in</span> sim.nodes)</pre>
+                </div>
+            </div>
+
+            <!-- Key-Value Store Integration -->
+            <div class="state-machine glass glass-dark reveal" style="margin-top: 40px;">
+                <h3 style="color: #fff; font-size: 24px; font-weight: 600; margin-bottom: 12px; text-align: center;">Key-Value Store Integration</h3>
+                <p style="color: rgba(255,255,255,0.6); text-align: center; margin-bottom: 32px;">PyRaft includes a distributed key-value store as a reference implementation</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
+                    <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 16px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">📥</div>
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600;">SET Operation</h4>
+                        </div>
+                        <p style="color: rgba(255,255,255,0.6); font-size: 14px; line-height: 1.6;">Client sends SET request → Leader appends to log → Replicates to followers → Commits on majority → Applies to state machine → Returns success</p>
+                    </div>
+                    <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 16px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-green), var(--accent-teal)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">📤</div>
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600;">GET Operation</h4>
+                        </div>
+                        <p style="color: rgba(255,255,255,0.6); font-size: 14px; line-height: 1.6;">Read requests can be served immediately from committed state. For linearizable reads, leader must verify it still holds leadership via heartbeat round.</p>
+                    </div>
+                    <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 16px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-orange), var(--accent-red)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🗑️</div>
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600;">DELETE Operation</h4>
+                        </div>
+                        <p style="color: rgba(255,255,255,0.6); font-size: 14px; line-height: 1.6;">Follows same consensus path as SET. Delete command is logged and replicated, ensuring all nodes eventually remove the key from their local state.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Related Research Section -->
+    <section id="research" style="padding: 100px 0;">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-label">Publications</span>
+                <h2 class="section-title">Related Research</h2>
+                <p class="section-description">Academic and industry research building on Raft consensus for distributed systems.</p>
+            </div>
+
+            <div class="reveal" style="margin-top: 60px;">
+                <a href="research.html#compilers" target="_blank" class="glass glass-dark" style="display: block; padding: 40px; text-decoration: none; transition: all 0.4s ease; position: relative; overflow: hidden;">
+                    <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue), var(--accent-green)); opacity: 0.8;"></div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                                <span style="padding: 6px 14px; background: rgba(175, 82, 222, 0.2); color: var(--accent-purple); border-radius: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em;">TECHNICAL REPORT</span>
+                                <span style="color: rgba(255,255,255,0.4); font-size: 13px;">CS²B Technologies · 2020</span>
+                            </div>
+                            
+                            <h3 style="font-size: 26px; font-weight: 700; color: #fff; margin-bottom: 12px; letter-spacing: -0.02em;">Distributed Parameter Server with Raft Consensus</h3>
+                            
+                            <p style="color: rgba(255,255,255,0.6); font-size: 16px; line-height: 1.7; margin-bottom: 20px;">Fault-tolerant parameter server architecture using Raft consensus for distributed machine learning, achieving 40%+ throughput improvement in federated learning scenarios.</p>
+                            
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <span style="padding: 6px 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; font-size: 12px; color: rgba(255,255,255,0.7);">Distributed ML</span>
+                                <span style="padding: 6px 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; font-size: 12px; color: rgba(255,255,255,0.7);">Raft Consensus</span>
+                                <span style="padding: 6px 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; font-size: 12px; color: rgba(255,255,255,0.7);">Federated Learning</span>
+                                <span style="padding: 6px 12px; background: rgba(52, 199, 89, 0.2); border: 1px solid rgba(52, 199, 89, 0.3); border-radius: 6px; font-size: 12px; color: var(--accent-green); font-weight: 600;">40%+ Throughput</span>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
+                            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, rgba(175, 82, 222, 0.3), rgba(90, 200, 250, 0.2)); border: 1px solid rgba(175, 82, 222, 0.4); border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(175, 82, 222, 0.9)" stroke-width="1.5">
+                                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                            </div>
+                            <span style="display: flex; align-items: center; gap: 8px; color: var(--accent-blue); font-size: 14px; font-weight: 500;">
+                                View Research
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                                </svg>
+                            </span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Additional Research Links Grid -->
+            <div class="arch-grid reveal" style="margin-top: 32px;">
+                <a href="research.html#agentic" target="_blank" class="arch-card glass glass-dark" style="text-decoration: none; cursor: pointer;">
+                    <div class="arch-icon purple">🤖</div>
+                    <h3>Agentic AI Research</h3>
+                    <p>Multi-agent systems, enterprise LLM infrastructure, and agent communication protocols from CS²B Technologies.</p>
+                </a>
+                <a href="research.html#storage" target="_blank" class="arch-card glass glass-dark" style="text-decoration: none; cursor: pointer;">
+                    <div class="arch-icon orange">💾</div>
+                    <h3>Storage Systems</h3>
+                    <p>GPU-NVMe integration, distributed KV-cache offloading for LLM inference, and CXL memory architectures.</p>
+                </a>
+                <a href="research.html#networking" target="_blank" class="arch-card glass glass-dark" style="text-decoration: none; cursor: pointer;">
+                    <div class="arch-icon blue">🔗</div>
+                    <h3>High-Performance Networking</h3>
+                    <p>Ultra Ethernet, RDMA, NVMe-oF integration for AI/HPC workloads and data center fabrics.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-logo">PyRaft</div>
+            <p class="footer-text">A Python implementation of the Raft consensus algorithm<br>Designed for learning, testing, and understanding distributed systems</p>
+            <div class="footer-links">
+                <a href="https://raft.github.io" target="_blank">Raft Paper</a>
+                <a href="https://github.com/dabeaz-course/raft_2020_08" target="_blank">GitHub</a>
+                <a href="https://pdos.csail.mit.edu/6.824/" target="_blank">MIT 6.824</a>
+                <a href="research.html" target="_blank">CS²B Research</a>
+            </div>
+            <p style="margin-top: 24px; color: rgba(255,255,255,0.3); font-size: 12px;">
+                Part of the <a href="research.html#compilers" style="color: rgba(255,255,255,0.5);">CS²B Technologies</a> distributed systems research
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Scroll reveal animation
+        const revealElements = document.querySelectorAll('.reveal');
+        
+        const revealOnScroll = () => {
+            revealElements.forEach(el => {
+                const elementTop = el.getBoundingClientRect().top;
+                const windowHeight = window.innerHeight;
+                
+                if (elementTop < windowHeight - 100) {
+                    el.classList.add('active');
+                }
+            });
+        };
+
+        window.addEventListener('scroll', revealOnScroll);
+        revealOnScroll(); // Initial check
+
+        // TOC sidebar
+        const tocDots = document.querySelectorAll('.toc-dot');
+        const sections = document.querySelectorAll('section, header');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                
+                if (window.scrollY >= sectionTop - 300) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            tocDots.forEach(dot => {
+                dot.classList.remove('active');
+                if (dot.getAttribute('data-section') === current) {
+                    dot.classList.add('active');
+                }
+            });
+        });
+
+        // Smooth scroll for TOC
+        tocDots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const sectionId = dot.getAttribute('data-section');
+                const section = document.getElementById(sectionId);
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Smooth scroll for nav links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Log entry hover effect
+        document.querySelectorAll('.log-entry').forEach(entry => {
+            entry.addEventListener('mouseenter', function() {
+                this.style.boxShadow = '0 0 30px rgba(255,255,255,0.2)';
+            });
+            entry.addEventListener('mouseleave', function() {
+                this.style.boxShadow = 'none';
+            });
+        });
+
+        // State node interaction
+        document.querySelectorAll('.state-node').forEach(node => {
+            node.addEventListener('click', function() {
+                const stateName = this.querySelector('h4').textContent;
+                const descriptions = {
+                    'Follower': 'Followers are passive. They issue no requests on their own but respond to requests from leaders and candidates. All servers start as followers.',
+                    'Candidate': 'A follower becomes a candidate if it receives no communication from a leader within the election timeout. Candidates request votes from all other servers.',
+                    'Leader': 'The leader handles all client requests. If a client contacts a follower, the follower redirects to the leader. Leaders send heartbeats to maintain authority.'
+                };
+                
+                // Could show a tooltip or modal here
+                console.log(`${stateName}: ${descriptions[stateName]}`);
+            });
+        });
+    </script>
+</body>
+</html>
