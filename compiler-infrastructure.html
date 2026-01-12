@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Target Compiler Infrastructure | Deep Dive Research | CS²B Technologies</title>
+    <meta name="description" content="Comprehensive multi-target compiler infrastructure with deep dives into lexical analysis, LALR parsing, type checking, WebAssembly binary encoding, LLVM code generation, and stack-based IR design">
+    <meta name="author" content="Subramaniyam Venkata Pooni - CS²B Technologies Inc.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-void: #000000;
+            --bg-deep: #030306;
+            --bg-card: rgba(12, 12, 18, 0.95);
+            --bg-glass: rgba(255, 255, 255, 0.02);
+            --text-primary: #f0f0f5;
+            --text-secondary: rgba(240, 240, 245, 0.7);
+            --text-tertiary: rgba(240, 240, 245, 0.45);
+            --border-subtle: rgba(255, 255, 255, 0.06);
+            --lexer-cyan: #00f5ff;
+            --parser-blue: #4d7cff;
+            --ast-purple: #a855f7;
+            --checker-magenta: #ff00ff;
+            --ir-pink: #ff4da6;
+            --llvm-red: #ff3366;
+            --wasm-orange: #ff8c00;
+            --interp-gold: #ffd700;
+            --python-green: #00ff88;
+            --holo-1: rgba(0, 245, 255, 0.15);
+            --holo-2: rgba(77, 124, 255, 0.12);
+            --holo-3: rgba(168, 85, 247, 0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-void);
+            color: var(--text-primary);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+        .holo-universe {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .holo-grid {
+            position: absolute;
+            width: 300%; height: 200%;
+            top: 50%; left: -100%;
+            background-image: linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+            background-size: 80px 80px;
+            transform: perspective(400px) rotateX(75deg) translateY(-50%);
+            animation: grid-scroll 30s linear infinite;
+            mask-image: linear-gradient(transparent, black 30%, black 70%, transparent);
+        }
+        @keyframes grid-scroll {
+            0% { transform: perspective(400px) rotateX(75deg) translateY(-50%) translateZ(0); }
+            100% { transform: perspective(400px) rotateX(75deg) translateY(-50%) translateZ(80px); }
+        }
+        .holo-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            animation: orb-drift 20s ease-in-out infinite;
+        }
+        .holo-orb-1 { width: 800px; height: 800px; top: -300px; right: -200px; background: radial-gradient(circle, var(--holo-1) 0%, transparent 70%); }
+        .holo-orb-2 { width: 600px; height: 600px; bottom: -200px; left: -200px; background: radial-gradient(circle, var(--holo-2) 0%, transparent 70%); animation-delay: -7s; }
+        .holo-orb-3 { width: 500px; height: 500px; top: 40%; left: 40%; background: radial-gradient(circle, var(--holo-3) 0%, transparent 70%); animation-delay: -14s; }
+        @keyframes orb-drift {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+            50% { transform: translate(-30px, 50px) scale(0.9); opacity: 0.7; }
+        }
+        .nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+            padding: 0 60px;
+            height: 72px;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            text-decoration: none;
+        }
+        .nav-logo {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--lexer-cyan), var(--parser-blue), var(--ast-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 0.7rem;
+            color: white;
+            box-shadow: 0 0 30px rgba(0, 245, 255, 0.3);
+        }
+        .nav-title { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
+        .nav-links { display: flex; gap: 28px; list-style: none; }
+        .nav-links a { color: var(--text-tertiary); text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: all 0.3s; }
+        .nav-links a:hover { color: var(--lexer-cyan); }
+        .content { position: relative; z-index: 1; }
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 140px 60px 100px;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 24px;
+            background: rgba(0, 245, 255, 0.08);
+            border: 1px solid rgba(0, 245, 255, 0.2);
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--lexer-cyan);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+            animation: badge-glow 3s ease-in-out infinite;
+        }
+        @keyframes badge-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 245, 255, 0.2); }
+            50% { box-shadow: 0 0 40px rgba(0, 245, 255, 0.4); }
+        }
+        .hero-badge-pulse {
+            width: 10px; height: 10px;
+            background: var(--lexer-cyan);
+            border-radius: 50%;
+            animation: pulse-ring 2s ease-out infinite;
+            box-shadow: 0 0 20px var(--lexer-cyan);
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        .hero-title {
+            font-size: 4.5rem;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            line-height: 1.05;
+            margin-bottom: 24px;
+            max-width: 1000px;
+        }
+        .hero-title .gradient {
+            background: linear-gradient(135deg, var(--lexer-cyan) 0%, var(--parser-blue) 30%, var(--ast-purple) 60%, var(--checker-magenta) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-subtitle {
+            font-size: 1.3rem;
+            color: var(--text-secondary);
+            max-width: 900px;
+            margin-bottom: 60px;
+            line-height: 1.8;
+        }
+        .toc {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 40px;
+        }
+        .toc-item {
+            padding: 14px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .toc-item:hover {
+            border-color: var(--lexer-cyan);
+            color: var(--lexer-cyan);
+            transform: translateY(-3px);
+        }
+        .stats-bar {
+            padding: 80px 60px;
+            background: var(--bg-deep);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .stats-grid {
+            display: flex;
+            justify-content: center;
+            gap: 80px;
+            max-width: 1400px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+        .stat-card { text-align: center; }
+        .stat-value {
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--lexer-cyan), var(--ast-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+        }
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 12px;
+        }
+        .section {
+            padding: 120px 60px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .section-header { text-align: center; margin-bottom: 60px; }
+        .section-eyebrow {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--lexer-cyan);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 2.8rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 20px;
+        }
+        .section-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-tertiary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .deep-dive {
+            background: var(--bg-deep);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .deep-dive.wasm { border-left: 4px solid var(--wasm-orange); }
+        .deep-dive.llvm { border-left: 4px solid var(--llvm-red); }
+        .deep-dive.lang { border-left: 4px solid var(--ast-purple); }
+        .deep-dive.lexer { border-left: 4px solid var(--lexer-cyan); }
+        .deep-dive.parser { border-left: 4px solid var(--parser-blue); }
+        .deep-dive.checker { border-left: 4px solid var(--checker-magenta); }
+        .deep-dive.interp { border-left: 4px solid var(--interp-gold); }
+        .article { max-width: 900px; margin: 0 auto; }
+        .article h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 60px 0 24px;
+            padding-top: 40px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .article h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .article h3 { font-size: 1.4rem; font-weight: 600; margin: 40px 0 16px; color: var(--text-primary); }
+        .article h4 { font-size: 1.1rem; font-weight: 600; margin: 32px 0 12px; color: var(--text-secondary); }
+        .article p { font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.8; }
+        .article ul, .article ol { margin: 20px 0 20px 24px; color: var(--text-secondary); }
+        .article li { margin-bottom: 12px; line-height: 1.7; }
+        .article strong { color: var(--text-primary); font-weight: 600; }
+        .highlight-box {
+            background: rgba(0, 245, 255, 0.05);
+            border: 1px solid rgba(0, 245, 255, 0.2);
+            border-radius: 16px;
+            padding: 28px;
+            margin: 32px 0;
+        }
+        .highlight-box.orange { background: rgba(255, 140, 0, 0.05); border-color: rgba(255, 140, 0, 0.2); }
+        .highlight-box.red { background: rgba(255, 51, 102, 0.05); border-color: rgba(255, 51, 102, 0.2); }
+        .highlight-box.purple { background: rgba(168, 85, 247, 0.05); border-color: rgba(168, 85, 247, 0.2); }
+        .highlight-box.gold { background: rgba(255, 215, 0, 0.05); border-color: rgba(255, 215, 0, 0.2); }
+        .highlight-box.blue { background: rgba(77, 124, 255, 0.05); border-color: rgba(77, 124, 255, 0.2); }
+        .highlight-box-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            color: var(--lexer-cyan);
+        }
+        .highlight-box.orange .highlight-box-title { color: var(--wasm-orange); }
+        .highlight-box.red .highlight-box-title { color: var(--llvm-red); }
+        .highlight-box.purple .highlight-box-title { color: var(--ast-purple); }
+        .highlight-box.gold .highlight-box-title { color: var(--interp-gold); }
+        .highlight-box.blue .highlight-box-title { color: var(--parser-blue); }
+        .highlight-box p:last-child { margin-bottom: 0; }
+        .code-block {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            margin: 28px 0;
+            overflow: hidden;
+        }
+        .code-header {
+            padding: 14px 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .code-dots { display: flex; gap: 6px; }
+        .code-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .code-dot:nth-child(1) { background: #ff5f57; }
+        .code-dot:nth-child(2) { background: #febc2e; }
+        .code-dot:nth-child(3) { background: #28c840; }
+        .code-filename { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-tertiary); }
+        .code-body {
+            padding: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+        .code-body pre { margin: 0; white-space: pre; }
+        .syn-keyword { color: var(--ast-purple); font-weight: 600; }
+        .syn-type { color: var(--lexer-cyan); }
+        .syn-function { color: var(--python-green); }
+        .syn-number { color: var(--wasm-orange); }
+        .syn-string { color: var(--interp-gold); }
+        .syn-comment { color: var(--text-tertiary); font-style: italic; }
+        .syn-opcode { color: var(--llvm-red); font-weight: 600; }
+        .syn-hex { color: var(--checker-magenta); }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 28px 0;
+            font-size: 0.9rem;
+        }
+        .data-table th {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .data-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+        }
+        .data-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+        .data-table code {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        .opcode-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 28px 0;
+        }
+        .opcode-item {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .opcode-name { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+        .opcode-hex { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--checker-magenta); }
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+        .arch-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s;
+        }
+        .arch-card:hover { transform: translateY(-5px); border-color: var(--card-accent); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3); }
+        .arch-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--card-accent); }
+        .arch-card.wasm { --card-accent: var(--wasm-orange); }
+        .arch-card.llvm { --card-accent: var(--llvm-red); }
+        .arch-card.ir { --card-accent: var(--ir-pink); }
+        .arch-card.interp { --card-accent: var(--interp-gold); }
+        .arch-card.lexer { --card-accent: var(--lexer-cyan); }
+        .arch-card.parser { --card-accent: var(--parser-blue); }
+        .arch-card.checker { --card-accent: var(--checker-magenta); }
+        .arch-icon { font-size: 2.5rem; margin-bottom: 20px; }
+        .arch-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 12px; }
+        .arch-desc { font-size: 0.95rem; color: var(--text-tertiary); line-height: 1.7; }
+        .pipeline-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 40px 0;
+            padding: 30px;
+            background: var(--bg-card);
+            border-radius: 16px;
+            border: 1px solid var(--border-subtle);
+        }
+        .pipeline-stage {
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+        }
+        .pipeline-arrow { color: var(--text-tertiary); font-size: 1.2rem; }
+        .footer {
+            padding: 80px 60px;
+            text-align: center;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .footer-author {
+            display: inline-flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px 32px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-subtle);
+            border-radius: 100px;
+            text-decoration: none;
+            margin-bottom: 32px;
+            transition: all 0.3s;
+        }
+        .footer-author:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--lexer-cyan); }
+        .footer-avatar {
+            width: 52px; height: 52px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--lexer-cyan), var(--ast-purple));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; font-weight: 800; color: white;
+        }
+        .footer-info { text-align: left; }
+        .footer-name { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+        .footer-role { font-size: 0.85rem; color: var(--text-tertiary); }
+        .footer-links { display: flex; justify-content: center; gap: 32px; margin-top: 24px; }
+        .footer-link { color: var(--text-tertiary); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .footer-link:hover { color: var(--lexer-cyan); }
+        .footer-copy { margin-top: 32px; font-size: 0.8rem; color: var(--text-tertiary); }
+        @media (max-width: 900px) {
+            .nav { padding: 0 24px; }
+            .nav-links { display: none; }
+            .hero { padding: 120px 24px 80px; }
+            .hero-title { font-size: 2.8rem; }
+            .section { padding: 80px 24px; }
+            .stats-grid { gap: 40px; }
+            .arch-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="holo-universe">
+        <div class="holo-grid"></div>
+        <div class="holo-orb holo-orb-1"></div>
+        <div class="holo-orb holo-orb-2"></div>
+        <div class="holo-orb holo-orb-3"></div>
+    </div>
+    <nav class="nav">
+        <a href="index.html" class="nav-brand">
+            <span class="nav-logo">CS²B</span>
+            <span class="nav-title">CSSQUAREDB Technologies</span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="#language">Language</a></li>
+            <li><a href="#lexer">Lexer</a></li>
+            <li><a href="#parser">Parser</a></li>
+            <li><a href="#checker">Type Checker</a></li>
+            <li><a href="#webassembly">WebAssembly</a></li>
+            <li><a href="#llvm">LLVM</a></li>
+            <li><a href="research.html">All Research</a></li>
+        </ul>
+    </nav>
+    <div class="content">
+        <section class="hero">
+            <div class="hero-badge">
+                <span class="hero-badge-pulse"></span>
+                Deep Dive Research · Compiler Infrastructure
+            </div>
+            <h1 class="hero-title">
+                <span class="gradient">Multi-Target</span><br>Compiler Architecture
+            </h1>
+            <p class="hero-subtitle">
+                A comprehensive exploration of modern compiler design implementing lexical analysis with SLY, LALR(1) parsing with AST generation, semantic type checking with symbol tables, stack-based intermediate code generation, and multiple backend targets including LLVM native code, WebAssembly binary encoding, Python transpilation, and direct interpretation.
+            </p>
+            <div class="pipeline-flow">
+                <span class="pipeline-stage" style="background: var(--lexer-cyan);">Source</span>
+                <span class="pipeline-arrow">→</span>
+                <span class="pipeline-stage" style="background: var(--lexer-cyan);">Lexer</span>
+                <span class="pipeline-arrow">→</span>
+                <span class="pipeline-stage" style="background: var(--parser-blue);">Parser</span>
+                <span class="pipeline-arrow">→</span>
+                <span class="pipeline-stage" style="background: var(--ast-purple);">AST</span>
+                <span class="pipeline-arrow">→</span>
+                <span class="pipeline-stage" style="background: var(--checker-magenta);">Checker</span>
+                <span class="pipeline-arrow">→</span>
+                <span class="pipeline-stage" style="background: var(--ir-pink);">IR</span>
+                <span class="pipeline-arrow">→</span>
+                <span class="pipeline-stage" style="background: var(--llvm-red);">Backend</span>
+            </div>
+            <div class="toc">
+                <a href="#language" class="toc-item">📝 Language Spec</a>
+                <a href="#lexer" class="toc-item">🔤 Lexical Analysis</a>
+                <a href="#parser" class="toc-item">🌳 Parsing & AST</a>
+                <a href="#checker" class="toc-item">✓ Type Checking</a>
+                <a href="#ir" class="toc-item">⚙️ IR Design</a>
+                <a href="#interpreter" class="toc-item">▶️ Interpreter</a>
+                <a href="#webassembly" class="toc-item">🌐 WebAssembly</a>
+                <a href="#llvm" class="toc-item">🔧 LLVM Codegen</a>
+            </div>
+        </section>
+        <section class="stats-bar">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value">9</div><div class="stat-label">Project Phases</div></div>
+                <div class="stat-card"><div class="stat-value">4</div><div class="stat-label">Backend Targets</div></div>
+                <div class="stat-card"><div class="stat-value">50+</div><div class="stat-label">IR Opcodes</div></div>
+                <div class="stat-card"><div class="stat-value">4</div><div class="stat-label">Data Types</div></div>
+                <div class="stat-card"><div class="stat-value">10</div><div class="stat-label">WASM Sections</div></div>
+            </div>
+        </section>
+
+        <!-- Language Specification -->
+        <section class="section deep-dive lang" id="language">
+            <div class="section-header">
+                <p class="section-eyebrow">Language Design</p>
+                <h2 class="section-title">Source Language Specification</h2>
+                <p class="section-subtitle">A statically-typed systems programming language with direct memory access.</p>
+            </div>
+            <div class="article">
+                <h2>Type System</h2>
+                <p>The language features four built-in primitive types with explicit sizing for predictable performance across all backend targets:</p>
+                <table class="data-table">
+                    <thead><tr><th>Type</th><th>Size</th><th>Description</th><th>Example</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>int</code></td><td>32-bit</td><td>Signed integer</td><td><code>var x int = 42;</code></td></tr>
+                        <tr><td><code>float</code></td><td>64-bit</td><td>IEEE 754 double precision</td><td><code>var pi float = 3.14159;</code></td></tr>
+                        <tr><td><code>char</code></td><td>8-bit</td><td>Single byte character</td><td><code>var c char = 'A';</code></td></tr>
+                        <tr><td><code>bool</code></td><td>1-bit</td><td>Boolean true/false</td><td><code>var flag bool = true;</code></td></tr>
+                    </tbody>
+                </table>
+                <div class="highlight-box purple">
+                    <div class="highlight-box-title">No Automatic Type Coercion</div>
+                    <p>Integers and floats cannot be mixed in expressions. Operations require both operands to be the same type. For <code>x / y</code> to be legal, both x and y must match. The result type is always the same as the operands. Integer division truncates. Explicit type casting functions must be used for conversions.</p>
+                </div>
+                
+                <h2>Lexical Conventions</h2>
+                <p>The language follows standard lexical conventions for identifiers, literals, and comments:</p>
+                <ul>
+                    <li><strong>Statements:</strong> Terminated by semicolons (<code>print 3;</code>)</li>
+                    <li><strong>Single-line comments:</strong> <code>// This is a comment</code></li>
+                    <li><strong>Multi-line comments:</strong> <code>/* This spans multiple lines */</code></li>
+                    <li><strong>Identifiers:</strong> Letters, numbers, underscore; must start with non-numeric</li>
+                    <li><strong>Character literals:</strong> Single quotes with escape codes (<code>'h'</code>, <code>'\n'</code>, <code>'\xhh'</code>)</li>
+                </ul>
+                <p><strong>Reserved words:</strong> <code>const else import false func if print return true while var break continue</code></p>
+
+                <h2>Operators and Precedence</h2>
+                <p>All operators are left-associative. Precedence from highest to lowest:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">precedence_rules.txt</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment">// Highest precedence</span>
+<span class="syn-keyword">Unary:</span>     +  -  !          <span class="syn-comment">// Unary plus, minus, logical negation</span>
+<span class="syn-keyword">Factor:</span>    *  /             <span class="syn-comment">// Multiplication, division</span>
+<span class="syn-keyword">Term:</span>      +  -             <span class="syn-comment">// Addition, subtraction</span>
+<span class="syn-keyword">Relation:</span>  < <= > >= == !=  <span class="syn-comment">// Comparisons (non-associative!)</span>
+<span class="syn-keyword">Logic:</span>     &&               <span class="syn-comment">// Logical AND</span>
+<span class="syn-keyword">Logic:</span>     ||               <span class="syn-comment">// Logical OR (lowest precedence)</span></pre>
+                    </div>
+                </div>
+                <p><strong>Critical:</strong> Relational operators may NOT be chained. <code>a < b < c</code> is illegal; use <code>a < b && b < c</code> instead. Logical operators implement <strong>short-circuit evaluation</strong>: in <code>a && b</code>, if <code>a</code> is false, <code>b</code> is not evaluated.</p>
+
+                <h2>Control Flow</h2>
+                <p>The language supports structured control flow with <code>if-else</code> conditionals and <code>while</code> loops. The conditional expression must evaluate to type <code>bool</code>:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">control_flow.src</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment">// If-else statement (else is optional)</span>
+<span class="syn-keyword">if</span> (a < b) {
+    minval = a;
+} <span class="syn-keyword">else</span> {
+    minval = b;
+}
+
+<span class="syn-comment">// While loop with break and continue</span>
+<span class="syn-keyword">var</span> n <span class="syn-type">int</span> = <span class="syn-number">0</span>;
+<span class="syn-keyword">while</span> (n < <span class="syn-number">10</span>) {
+    <span class="syn-keyword">if</span> (n == <span class="syn-number">5</span>) {
+        <span class="syn-keyword">break</span>;      <span class="syn-comment">// Exit loop early</span>
+    }
+    <span class="syn-keyword">print</span> n;
+    n = n + <span class="syn-number">1</span>;
+}</pre>
+                    </div>
+                </div>
+
+                <h2>Functions</h2>
+                <p>Functions are defined with explicit parameter and return types. External functions can be imported for runtime integration:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">functions.src</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment">// External function import (resolved by linker/loader)</span>
+<span class="syn-keyword">import func</span> <span class="syn-function">sin</span>(x <span class="syn-type">float</span>) <span class="syn-type">float</span>;
+
+<span class="syn-comment">// Recursive function definition</span>
+<span class="syn-keyword">func</span> <span class="syn-function">fibonacci</span>(n <span class="syn-type">int</span>) <span class="syn-type">int</span> {
+    <span class="syn-keyword">if</span> (n <= <span class="syn-number">2</span>) {
+        <span class="syn-keyword">return</span> <span class="syn-number">1</span>;
+    } <span class="syn-keyword">else</span> {
+        <span class="syn-keyword">return</span> <span class="syn-function">fibonacci</span>(n-<span class="syn-number">1</span>) + <span class="syn-function">fibonacci</span>(n-<span class="syn-number">2</span>);
+    }
+}
+
+<span class="syn-comment">// Entry point: main() takes no args, returns int</span>
+<span class="syn-keyword">func</span> <span class="syn-function">main</span>() <span class="syn-type">int</span> {
+    <span class="syn-keyword">var</span> i <span class="syn-type">int</span> = <span class="syn-number">0</span>;
+    <span class="syn-keyword">while</span> (i < <span class="syn-number">20</span>) {
+        <span class="syn-keyword">print</span> <span class="syn-function">fibonacci</span>(i);
+        i = i + <span class="syn-number">1</span>;
+    }
+    <span class="syn-keyword">return</span> <span class="syn-number">0</span>;
+}</pre>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    <div class="highlight-box-title">Scoping Rules</div>
+                    <p><strong>Global scope:</strong> Declarations outside functions are visible to the entire program.</p>
+                    <p><strong>Local scope:</strong> Declarations inside functions are only visible within that function.</p>
+                    <p><strong>No nested functions:</strong> Function definitions cannot appear inside other functions.</p>
+                    <p><strong>Initialization order:</strong> Global variable initializations execute before <code>main()</code>.</p>
+                </div>
+
+                <h2>Direct Memory Access</h2>
+                <p>The language provides direct memory access using the backtick (<code>`</code>) operator. Memory addresses are integers, and the type is inferred from context:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">memory_access.src</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment">// Store values at memory addresses</span>
+`<span class="syn-number">128</span> = <span class="syn-number">45</span>;        <span class="syn-comment">// Store int 45 at address 128</span>
+`<span class="syn-number">128</span> = <span class="syn-number">4.5</span>;       <span class="syn-comment">// Store float 4.5 at address 128</span>
+`<span class="syn-number">128</span> = <span class="syn-string">'x'</span>;       <span class="syn-comment">// Store byte 'x' at address 128</span>
+
+<span class="syn-comment">// Write array to memory (4 bytes per int)</span>
+<span class="syn-keyword">var</span> addr <span class="syn-type">int</span> = <span class="syn-number">1000</span>;
+<span class="syn-keyword">var</span> n <span class="syn-type">int</span> = <span class="syn-number">0</span>;
+<span class="syn-keyword">while</span> (n < <span class="syn-number">100</span>) {
+    `(addr + n*<span class="syn-number">4</span>) = n;
+    n = n + <span class="syn-number">1</span>;
+}
+
+<span class="syn-comment">// Read and sum from memory</span>
+<span class="syn-keyword">var</span> total <span class="syn-type">int</span> = <span class="syn-number">0</span>;
+n = <span class="syn-number">0</span>;
+<span class="syn-keyword">while</span> (n < <span class="syn-number">100</span>) {
+    total = total + `(addr + n*<span class="syn-number">4</span>);
+    n = n + <span class="syn-number">1</span>;
+}
+<span class="syn-keyword">print</span> total;  <span class="syn-comment">// 4950</span></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lexer Section -->
+        <section class="section deep-dive lexer" id="lexer">
+            <div class="section-header">
+                <p class="section-eyebrow">Phase 1</p>
+                <h2 class="section-title">Lexical Analysis with SLY</h2>
+                <p class="section-subtitle">Breaking source code into tokens using regex-based pattern matching.</p>
+            </div>
+            <div class="article">
+                <h2>What is Lexical Analysis?</h2>
+                <p>The lexer (tokenizer) is the first phase of compilation. It transforms raw source text into a stream of tokens—the atomic units of the language's grammar. For example:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">tokenization_example.txt</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment">// Input source:</span>
+a = 3 + (4 * 5)
+
+<span class="syn-comment">// Output tokens:</span>
+ID(<span class="syn-string">'a'</span>) ASSIGN NUMBER(<span class="syn-number">3</span>) PLUS LPAREN NUMBER(<span class="syn-number">4</span>) TIMES NUMBER(<span class="syn-number">5</span>) RPAREN</pre>
+                    </div>
+                </div>
+                
+                <h2>Using SLY (Sly Lex Yacc)</h2>
+                <p>The compiler uses the SLY framework for lexing. Lexers are defined as classes where token patterns are specified as regular expressions:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">tokenizer.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">from</span> sly <span class="syn-keyword">import</span> Lexer
+
+<span class="syn-keyword">class</span> <span class="syn-type">SimpleLexer</span>(Lexer):
+    <span class="syn-comment"># Token names (terminals)</span>
+    tokens = { NUMBER, ID, PLUS, TIMES, LPAREN, RPAREN,
+               ASSIGN, LT, LE, GT, GE, EQ, NE, IF, ELSE, WHILE }
+    
+    <span class="syn-comment"># Ignored characters (whitespace)</span>
+    ignore = <span class="syn-string">' \t'</span>
+    
+    <span class="syn-comment"># Token patterns (order matters for overlapping patterns!)</span>
+    NUMBER = r<span class="syn-string">'\d+'</span>
+    ID = r<span class="syn-string">'[a-zA-Z_][a-zA-Z0-9_]*'</span>
+    PLUS = r<span class="syn-string">'\+'</span>
+    TIMES = r<span class="syn-string">'\*'</span>
+    LPAREN = r<span class="syn-string">'\('</span>
+    RPAREN = r<span class="syn-string">'\)'</span>
+    ASSIGN = r<span class="syn-string">'='</span>
+    
+    <span class="syn-comment"># Multi-character operators (must come before single-char!)</span>
+    LE = r<span class="syn-string">'<='</span>
+    GE = r<span class="syn-string">'>='</span>
+    EQ = r<span class="syn-string">'=='</span>
+    NE = r<span class="syn-string">'!='</span>
+    LT = r<span class="syn-string">'<'</span>
+    GT = r<span class="syn-string">'>'</span>
+    
+    <span class="syn-comment"># Reserved words (remap identifiers)</span>
+    ID[<span class="syn-string">'if'</span>] = IF
+    ID[<span class="syn-string">'else'</span>] = ELSE
+    ID[<span class="syn-string">'while'</span>] = WHILE
+    
+    <span class="syn-comment"># Track line numbers</span>
+    @_(r<span class="syn-string">'\n+'</span>)
+    <span class="syn-keyword">def</span> <span class="syn-function">ignore_newline</span>(self, t):
+        self.lineno += t.value.count(<span class="syn-string">'\n'</span>)
+    
+    <span class="syn-comment"># Error handling</span>
+    <span class="syn-keyword">def</span> <span class="syn-function">error</span>(self, t):
+        <span class="syn-keyword">print</span>(f<span class="syn-string">'Bad character {t.value[0]!r} at line {self.lineno}'</span>)
+        self.index += <span class="syn-number">1</span></pre>
+                    </div>
+                </div>
+                
+                <div class="highlight-box">
+                    <div class="highlight-box-title">Pattern Ordering Critical</div>
+                    <p>SLY matches patterns in the order defined. Multi-character operators like <code><=</code> must be defined <strong>before</strong> single-character <code><</code>, otherwise <code><=</code> would be tokenized as <code>LT</code> followed by <code>ASSIGN</code>.</p>
+                </div>
+
+                <h2>Token Output</h2>
+                <p>Each token carries its type, value, line number, and character index:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">token_output.txt</span>
+                    </div>
+                    <div class="code-body">
+<pre>Token(type=<span class="syn-string">'IF'</span>, value=<span class="syn-string">'if'</span>, lineno=<span class="syn-number">2</span>, index=<span class="syn-number">12</span>)
+Token(type=<span class="syn-string">'ID'</span>, value=<span class="syn-string">'a'</span>, lineno=<span class="syn-number">2</span>, index=<span class="syn-number">15</span>)
+Token(type=<span class="syn-string">'LT'</span>, value=<span class="syn-string">'<'</span>, lineno=<span class="syn-number">2</span>, index=<span class="syn-number">17</span>)
+Token(type=<span class="syn-string">'ID'</span>, value=<span class="syn-string">'b'</span>, lineno=<span class="syn-number">2</span>, index=<span class="syn-number">19</span>)
+Token(type=<span class="syn-string">'LE'</span>, value=<span class="syn-string">'<='</span>, lineno=<span class="syn-number">3</span>, index=<span class="syn-number">31</span>)</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Parser Section -->
+        <section class="section deep-dive parser" id="parser">
+            <div class="section-header">
+                <p class="section-eyebrow">Phase 2</p>
+                <h2 class="section-title">Parsing & Abstract Syntax Trees</h2>
+                <p class="section-subtitle">Transforming token streams into hierarchical tree structures.</p>
+            </div>
+            <div class="article">
+                <h2>What is Parsing?</h2>
+                <p>The parser consumes the token stream and produces an Abstract Syntax Tree (AST)—a hierarchical representation of the program's structure. Consider this expression:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">ast_example.txt</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment">// Source: a = 2 + 3 * (4 + 5)</span>
+<span class="syn-comment">// AST Structure:</span>
+
+              <span class="syn-keyword">=</span>
+            /   \
+          <span class="syn-string">"a"</span>    <span class="syn-keyword">+</span>
+               /   \
+              <span class="syn-number">2</span>     <span class="syn-keyword">*</span>
+                  /   \
+                 <span class="syn-number">3</span>     <span class="syn-keyword">+</span>
+                     /   \
+                    <span class="syn-number">4</span>     <span class="syn-number">5</span></pre>
+                    </div>
+                </div>
+
+                <h2>Grammar Rules in SLY</h2>
+                <p>Grammar rules are specified using decorated methods. The decorator gives the right-hand side, and the method name is the left-hand side:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">parser.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">from</span> sly <span class="syn-keyword">import</span> Parser
+
+<span class="syn-keyword">class</span> <span class="syn-type">SimpleParser</span>(Parser):
+    tokens = SimpleLexer.tokens
+    
+    <span class="syn-comment"># Grammar:  expr ::= expr PLUS term | term</span>
+    @_(<span class="syn-string">'expr PLUS term'</span>)
+    <span class="syn-keyword">def</span> <span class="syn-function">expr</span>(self, p):
+        <span class="syn-keyword">return</span> BinOp(<span class="syn-string">'+'</span>, p.expr, p.term)
+    
+    @_(<span class="syn-string">'term'</span>)
+    <span class="syn-keyword">def</span> <span class="syn-function">expr</span>(self, p):
+        <span class="syn-keyword">return</span> p.term
+    
+    <span class="syn-comment"># Grammar:  term ::= term TIMES factor | factor</span>
+    @_(<span class="syn-string">'term TIMES factor'</span>)
+    <span class="syn-keyword">def</span> <span class="syn-function">term</span>(self, p):
+        <span class="syn-keyword">return</span> BinOp(<span class="syn-string">'*'</span>, p.term, p.factor)
+    
+    @_(<span class="syn-string">'factor'</span>)
+    <span class="syn-keyword">def</span> <span class="syn-function">term</span>(self, p):
+        <span class="syn-keyword">return</span> p.factor
+    
+    <span class="syn-comment"># Grammar:  factor ::= LPAREN expr RPAREN | NUMBER | ID</span>
+    @_(<span class="syn-string">'LPAREN expr RPAREN'</span>)
+    <span class="syn-keyword">def</span> <span class="syn-function">factor</span>(self, p):
+        <span class="syn-keyword">return</span> p.expr
+    
+    @_(<span class="syn-string">'NUMBER'</span>)
+    <span class="syn-keyword">def</span> <span class="syn-function">factor</span>(self, p):
+        <span class="syn-keyword">return</span> Number(p.NUMBER)
+    
+    @_(<span class="syn-string">'ID'</span>)
+    <span class="syn-keyword">def</span> <span class="syn-function">factor</span>(self, p):
+        <span class="syn-keyword">return</span> Identifier(p.ID)</pre>
+                    </div>
+                </div>
+
+                <h2>AST Node Classes</h2>
+                <p>Each construct in the language has a corresponding AST node class:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">ast.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">class</span> <span class="syn-type">AST</span>:
+    <span class="syn-keyword">pass</span>
+
+<span class="syn-keyword">class</span> <span class="syn-type">Assignment</span>(AST):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self, location, value):
+        self.location = location
+        self.value = value
+
+<span class="syn-keyword">class</span> <span class="syn-type">BinOp</span>(AST):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self, operator, left, right):
+        self.operator = operator
+        self.left = left
+        self.right = right
+
+<span class="syn-keyword">class</span> <span class="syn-type">Number</span>(AST):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self, value):
+        self.value = value
+
+<span class="syn-keyword">class</span> <span class="syn-type">Identifier</span>(AST):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self, name):
+        self.name = name
+
+<span class="syn-keyword">class</span> <span class="syn-type">IfStatement</span>(AST):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self, condition, then_body, else_body):
+        self.condition = condition
+        self.then_body = then_body
+        self.else_body = else_body
+
+<span class="syn-keyword">class</span> <span class="syn-type">WhileLoop</span>(AST):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self, condition, body):
+        self.condition = condition
+        self.body = body
+
+<span class="syn-keyword">class</span> <span class="syn-type">FunctionDef</span>(AST):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self, name, params, return_type, body):
+        self.name = name
+        self.params = params
+        self.return_type = return_type
+        self.body = body</pre>
+                    </div>
+                </div>
+                
+                <div class="highlight-box blue">
+                    <div class="highlight-box-title">First Rule = Top of Grammar</div>
+                    <p>SLY treats the first decorated rule (first method with <code>@_(...)</code>) as the top of the grammar. This should be your highest-level construct, typically representing an entire program or module.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Type Checker Section -->
+        <section class="section deep-dive checker" id="checker">
+            <div class="section-header">
+                <p class="section-eyebrow">Phase 3</p>
+                <h2 class="section-title">Type Checking & Semantic Analysis</h2>
+                <p class="section-subtitle">Validating program correctness before code generation.</p>
+            </div>
+            <div class="article">
+                <h2>The Visitor Pattern</h2>
+                <p>Type checking traverses the AST using the Visitor pattern. A base <code>NodeVisitor</code> class dispatches to specific <code>visit_*</code> methods based on node type:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">checker.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">class</span> <span class="syn-type">TypeChecker</span>(NodeVisitor):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self):
+        self.symbols = {}  <span class="syn-comment"># Symbol table: name → type</span>
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">visit_Num</span>(self, node):
+        node.type = <span class="syn-string">'int'</span>  <span class="syn-comment"># Annotate with type</span>
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">visit_Name</span>(self, node):
+        <span class="syn-keyword">if</span> node.id <span class="syn-keyword">not in</span> self.symbols:
+            <span class="syn-keyword">print</span>(f<span class="syn-string">'Error: {node.id} not defined'</span>)
+        <span class="syn-keyword">else</span>:
+            node.type = self.symbols[node.id]
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">visit_BinOp</span>(self, node):
+        self.visit(node.left)
+        self.visit(node.right)
+        left_type = getattr(node.left, <span class="syn-string">'type'</span>, <span class="syn-keyword">None</span>)
+        right_type = getattr(node.right, <span class="syn-string">'type'</span>, <span class="syn-keyword">None</span>)
+        
+        <span class="syn-keyword">if</span> left_type != right_type:
+            <span class="syn-keyword">print</span>(f<span class="syn-string">'Error: Type mismatch {left_type} vs {right_type}'</span>)
+            node.type = <span class="syn-string">'error'</span>
+        <span class="syn-keyword">else</span>:
+            node.type = left_type</pre>
+                    </div>
+                </div>
+
+                <h2>Symbol Tables</h2>
+                <p>The compiler maintains symbol tables mapping identifiers to their types. With functions, two-level scoping is needed:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">symbol_tables.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">class</span> <span class="syn-type">TypeChecker</span>(NodeVisitor):
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self):
+        self.global_symbols = {}  <span class="syn-comment"># Global scope</span>
+        self.local_symbols = {}   <span class="syn-comment"># Local scope (inside function)</span>
+        self.in_function = <span class="syn-keyword">False</span>
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">lookup</span>(self, name):
+        <span class="syn-comment"># Check local first, then global</span>
+        <span class="syn-keyword">if</span> name <span class="syn-keyword">in</span> self.local_symbols:
+            <span class="syn-keyword">return</span> self.local_symbols[name]
+        <span class="syn-keyword">return</span> self.global_symbols.get(name)
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">define</span>(self, name, type_info):
+        <span class="syn-keyword">if</span> self.in_function:
+            self.local_symbols[name] = type_info
+        <span class="syn-keyword">else</span>:
+            self.global_symbols[name] = type_info</pre>
+                    </div>
+                </div>
+
+                <h2>Type Capabilities</h2>
+                <p>A table defines which operations are valid for each type combination:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">type_capabilities.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment"># (left_type, operator, right_type) → result_type</span>
+supported_binops = {
+    (<span class="syn-string">'int'</span>, <span class="syn-string">'+'</span>, <span class="syn-string">'int'</span>): <span class="syn-string">'int'</span>,
+    (<span class="syn-string">'int'</span>, <span class="syn-string">'-'</span>, <span class="syn-string">'int'</span>): <span class="syn-string">'int'</span>,
+    (<span class="syn-string">'int'</span>, <span class="syn-string">'*'</span>, <span class="syn-string">'int'</span>): <span class="syn-string">'int'</span>,
+    (<span class="syn-string">'int'</span>, <span class="syn-string">'/'</span>, <span class="syn-string">'int'</span>): <span class="syn-string">'int'</span>,
+    (<span class="syn-string">'float'</span>, <span class="syn-string">'+'</span>, <span class="syn-string">'float'</span>): <span class="syn-string">'float'</span>,
+    (<span class="syn-string">'float'</span>, <span class="syn-string">'-'</span>, <span class="syn-string">'float'</span>): <span class="syn-string">'float'</span>,
+    (<span class="syn-string">'float'</span>, <span class="syn-string">'*'</span>, <span class="syn-string">'float'</span>): <span class="syn-string">'float'</span>,
+    (<span class="syn-string">'float'</span>, <span class="syn-string">'/'</span>, <span class="syn-string">'float'</span>): <span class="syn-string">'float'</span>,
+    (<span class="syn-string">'int'</span>, <span class="syn-string">'<'</span>, <span class="syn-string">'int'</span>): <span class="syn-string">'bool'</span>,
+    (<span class="syn-string">'float'</span>, <span class="syn-string">'<'</span>, <span class="syn-string">'float'</span>): <span class="syn-string">'bool'</span>,
+    <span class="syn-comment"># ... etc</span>
+}</pre>
+                    </div>
+                </div>
+
+                <div class="highlight-box purple">
+                    <div class="highlight-box-title">Semantic Checks Performed</div>
+                    <p><strong>Undefined names:</strong> Using a variable before declaration</p>
+                    <p><strong>Type mismatches:</strong> <code>int + float</code> without explicit cast</p>
+                    <p><strong>Invalid operations:</strong> <code>char * char</code> not supported</p>
+                    <p><strong>Function signatures:</strong> Argument count and types must match</p>
+                    <p><strong>Return type:</strong> Returned value must match declared return type</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interpreter Section -->
+        <section class="section deep-dive interp" id="interpreter">
+            <div class="section-header">
+                <p class="section-eyebrow">Execution Target</p>
+                <h2 class="section-title">Stack Machine Interpreter</h2>
+                <p class="section-subtitle">Direct execution of IR code on a simulated machine.</p>
+            </div>
+            <div class="article">
+                <h2>Interpreter Architecture</h2>
+                <p>The interpreter simulates a stack machine with memory, a value stack, and a program counter:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">interpreter.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">class</span> <span class="syn-type">Interpreter</span>:
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self):
+        self.store = {}    <span class="syn-comment"># Variable storage</span>
+        self.stack = []    <span class="syn-comment"># Operand stack</span>
+        self.pc = <span class="syn-number">0</span>        <span class="syn-comment"># Program counter</span>
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">run</span>(self, code):
+        self.pc = <span class="syn-number">0</span>
+        <span class="syn-keyword">while</span> self.pc < len(code):
+            op, *opargs = code[self.pc]
+            getattr(self, f<span class="syn-string">'run_{op}'</span>)(*opargs)
+            self.pc += <span class="syn-number">1</span>
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">push</span>(self, item):
+        self.stack.append(item)
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">pop</span>(self):
+        <span class="syn-keyword">return</span> self.stack.pop()
+    
+    <span class="syn-comment"># Variable operations</span>
+    <span class="syn-keyword">def</span> <span class="syn-function">run_VARI</span>(self, name):
+        self.store[name] = <span class="syn-keyword">None</span>
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">run_CONSTI</span>(self, value):
+        self.push(value)
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">run_STORE</span>(self, name):
+        self.store[name] = self.pop()
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">run_LOAD</span>(self, name):
+        self.push(self.store[name])
+    
+    <span class="syn-comment"># Arithmetic operations</span>
+    <span class="syn-keyword">def</span> <span class="syn-function">run_ADDI</span>(self):
+        self.push(self.pop() + self.pop())
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">run_MULI</span>(self):
+        self.push(self.pop() * self.pop())
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">run_SUBI</span>(self):
+        right = self.pop()
+        left = self.pop()
+        self.push(left - right)  <span class="syn-comment"># Order matters!</span>
+    
+    <span class="syn-comment"># I/O</span>
+    <span class="syn-keyword">def</span> <span class="syn-function">run_PRINTI</span>(self):
+        <span class="syn-keyword">print</span>(self.pop())</pre>
+                    </div>
+                </div>
+
+                <h2>Example Execution</h2>
+                <p>The following source code and its corresponding IR execution:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">execution_trace.txt</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment">// Source:</span>
+<span class="syn-keyword">var</span> x <span class="syn-type">int</span> = <span class="syn-number">4</span>;
+<span class="syn-keyword">var</span> y <span class="syn-type">int</span> = <span class="syn-number">5</span>;
+<span class="syn-keyword">var</span> d <span class="syn-type">int</span> = x * x + y * y;
+<span class="syn-keyword">print</span> d;
+
+<span class="syn-comment">// IR Code:</span>
+[(<span class="syn-string">'VARI'</span>, <span class="syn-string">'x'</span>),     <span class="syn-comment">// Declare x</span>
+ (<span class="syn-string">'CONSTI'</span>, <span class="syn-number">4</span>),     <span class="syn-comment">// Push 4</span>
+ (<span class="syn-string">'STORE'</span>, <span class="syn-string">'x'</span>),     <span class="syn-comment">// x = 4</span>
+ (<span class="syn-string">'VARI'</span>, <span class="syn-string">'y'</span>),     <span class="syn-comment">// Declare y</span>
+ (<span class="syn-string">'CONSTI'</span>, <span class="syn-number">5</span>),     <span class="syn-comment">// Push 5</span>
+ (<span class="syn-string">'STORE'</span>, <span class="syn-string">'y'</span>),     <span class="syn-comment">// y = 5</span>
+ (<span class="syn-string">'VARI'</span>, <span class="syn-string">'d'</span>),     <span class="syn-comment">// Declare d</span>
+ (<span class="syn-string">'LOAD'</span>, <span class="syn-string">'x'</span>),      <span class="syn-comment">// Push x (4)</span>
+ (<span class="syn-string">'LOAD'</span>, <span class="syn-string">'x'</span>),      <span class="syn-comment">// Push x (4)</span>
+ (<span class="syn-string">'MULI'</span>,),         <span class="syn-comment">// Pop 4,4 → Push 16</span>
+ (<span class="syn-string">'LOAD'</span>, <span class="syn-string">'y'</span>),      <span class="syn-comment">// Push y (5)</span>
+ (<span class="syn-string">'LOAD'</span>, <span class="syn-string">'y'</span>),      <span class="syn-comment">// Push y (5)</span>
+ (<span class="syn-string">'MULI'</span>,),         <span class="syn-comment">// Pop 5,5 → Push 25</span>
+ (<span class="syn-string">'ADDI'</span>,),         <span class="syn-comment">// Pop 16,25 → Push 41</span>
+ (<span class="syn-string">'STORE'</span>, <span class="syn-string">'d'</span>),     <span class="syn-comment">// d = 41</span>
+ (<span class="syn-string">'LOAD'</span>, <span class="syn-string">'d'</span>),      <span class="syn-comment">// Push d (41)</span>
+ (<span class="syn-string">'PRINTI'</span>,)]       <span class="syn-comment">// Print 41</span>
+
+<span class="syn-comment">// Output: 41</span></pre>
+                    </div>
+                </div>
+                
+                <div class="highlight-box gold">
+                    <div class="highlight-box-title">Why Interpret?</div>
+                    <p>Direct interpretation enables rapid development and testing without compilation. This is how Python, Ruby, and PHP work—simulation is a core aspect of dynamic typing. The tradeoff is performance: interpreted code runs substantially slower than compiled native code.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- IR Section -->
+        <section class="section" id="ir">
+            <div class="section-header">
+                <p class="section-eyebrow">Intermediate Representation</p>
+                <h2 class="section-title">Stack Machine IR Design</h2>
+                <p class="section-subtitle">The portable bridge between frontend and backends.</p>
+            </div>
+            <div class="article">
+                <div class="highlight-box">
+                    <div class="highlight-box-title">Design Philosophy</div>
+                    <p><strong>No Registers:</strong> Operands are implicitly on the stack—no register allocation needed.</p>
+                    <p><strong>Structured Control:</strong> IF/ELSE/ENDIF and LOOP/CBREAK/ENDLOOP—no goto or labels.</p>
+                    <p><strong>WebAssembly Alignment:</strong> Near-direct translation to Wasm's stack-based model.</p>
+                </div>
+                <h3>Complete IR Opcode Reference</h3>
+                <table class="data-table">
+                    <thead><tr><th>Category</th><th>Opcodes</th><th>Stack Effect</th></tr></thead>
+                    <tbody>
+                        <tr><td>Constants</td><td><code>CONSTI</code>, <code>CONSTF</code></td><td>→ value</td></tr>
+                        <tr><td>Arithmetic</td><td><code>ADDI/F</code>, <code>SUBI/F</code>, <code>MULI/F</code>, <code>DIVI/F</code></td><td>a, b → result</td></tr>
+                        <tr><td>Comparison</td><td><code>LTI/F</code>, <code>LEI/F</code>, <code>GTI/F</code>, <code>GEI/F</code>, <code>EQI/F</code>, <code>NEI/F</code></td><td>a, b → bool</td></tr>
+                        <tr><td>Logic</td><td><code>ANDI</code>, <code>ORI</code></td><td>a, b → result</td></tr>
+                        <tr><td>Local Vars</td><td><code>VARI</code>, <code>VARF</code></td><td>— (declare)</td></tr>
+                        <tr><td>Global Vars</td><td><code>GLOBALI</code>, <code>GLOBALF</code></td><td>— (declare)</td></tr>
+                        <tr><td>Load/Store</td><td><code>LOAD</code>, <code>STORE</code></td><td>→ value / value →</td></tr>
+                        <tr><td>Conversion</td><td><code>ITOF</code>, <code>FTOI</code></td><td>value → converted</td></tr>
+                        <tr><td>I/O</td><td><code>PRINTI</code>, <code>PRINTF</code>, <code>PRINTB</code></td><td>value → (output)</td></tr>
+                        <tr><td>Memory</td><td><code>GROW</code>, <code>PEEKI/F/B</code>, <code>POKEI/F/B</code></td><td>varies</td></tr>
+                        <tr><td>Control</td><td><code>IF</code>, <code>ELSE</code>, <code>ENDIF</code></td><td>cond → (branch)</td></tr>
+                        <tr><td>Loops</td><td><code>LOOP</code>, <code>CBREAK</code>, <code>ENDLOOP</code></td><td>varies</td></tr>
+                        <tr><td>Functions</td><td><code>CALL</code>, <code>RETURN</code></td><td>args → result</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Structured Control Flow</h3>
+                <p>The IR uses structured control flow without goto statements or labels:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">structured_control.txt</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment">// If-statement pattern:</span>
+... evaluate condition ...
+(<span class="syn-string">'IF'</span>,)
+... consequent code ...
+(<span class="syn-string">'ELSE'</span>,)
+... alternative code ...
+(<span class="syn-string">'ENDIF'</span>,)
+
+<span class="syn-comment">// While-loop pattern:</span>
+(<span class="syn-string">'LOOP'</span>,)
+... evaluate test (invert condition!) ...
+(<span class="syn-string">'CBREAK'</span>,)          <span class="syn-comment">// Break if test is true</span>
+... loop body ...
+(<span class="syn-string">'ENDLOOP'</span>,)         <span class="syn-comment">// Jump back to LOOP</span></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- WebAssembly Deep Dive -->
+        <section class="section deep-dive wasm" id="webassembly">
+            <div class="section-header">
+                <p class="section-eyebrow">Deep Dive</p>
+                <h2 class="section-title">WebAssembly Binary Encoding</h2>
+                <p class="section-subtitle">Direct .wasm generation without external tools.</p>
+            </div>
+            <div class="article">
+                <h2>What is WebAssembly?</h2>
+                <p>WebAssembly (Wasm) is a binary instruction format designed as a portable compilation target. It runs in web browsers at near-native speed in a memory-safe, sandboxed environment. Key characteristics:</p>
+                <div class="highlight-box orange">
+                    <div class="highlight-box-title">Key Characteristics</div>
+                    <p><strong>Binary Format:</strong> Compact binary encoding enables faster parsing than JavaScript text.</p>
+                    <p><strong>Stack Machine:</strong> Operations pop operands from and push results onto an implicit stack.</p>
+                    <p><strong>Structured Control:</strong> Uses block/loop/if instructions—no arbitrary goto.</p>
+                    <p><strong>Four Value Types:</strong> i32, i64, f32, f64—that's it!</p>
+                </div>
+
+                <h2>LEB128 Variable-Length Encoding</h2>
+                <p>WebAssembly uses LEB128 (Little Endian Base 128) for integers. Each byte uses 7 bits for data and 1 bit as a continuation flag:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">leb128.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">def</span> <span class="syn-function">encode_unsigned</span>(value):
+    <span class="syn-string">'''LEB128 unsigned integer encoding.'''</span>
+    parts = []
+    <span class="syn-keyword">for</span> i <span class="syn-keyword">in</span> range((value.bit_length() // <span class="syn-number">7</span>) + <span class="syn-number">1</span>):
+        parts.append((value & <span class="syn-hex">0x7f</span>) | <span class="syn-hex">0x80</span>)  <span class="syn-comment"># 7 bits + continuation</span>
+        value >>= <span class="syn-number">7</span>
+    <span class="syn-keyword">if not</span> parts:
+        parts.append(<span class="syn-number">0</span>)
+    parts[-<span class="syn-number">1</span>] &= <span class="syn-hex">0x7f</span>  <span class="syn-comment"># Clear continuation on last byte</span>
+    <span class="syn-keyword">return</span> bytes(parts)
+
+<span class="syn-keyword">def</span> <span class="syn-function">encode_signed</span>(value):
+    <span class="syn-string">'''LEB128 signed integer encoding.'''</span>
+    <span class="syn-keyword">if</span> value >= <span class="syn-number">0</span>:
+        <span class="syn-keyword">return</span> encode_unsigned(value)
+    <span class="syn-keyword">else</span>:
+        value = (<span class="syn-number">1</span> << (value.bit_length() + (<span class="syn-number">7</span> - value.bit_length() % <span class="syn-number">7</span>))) + value
+        <span class="syn-keyword">return</span> encode_unsigned(value)
+
+<span class="syn-keyword">def</span> <span class="syn-function">encode_f64</span>(value):
+    <span class="syn-string">'''Encode 64-bit float as little endian.'''</span>
+    <span class="syn-keyword">import</span> struct
+    <span class="syn-keyword">return</span> struct.pack(<span class="syn-string">'<d'</span>, value)
+
+<span class="syn-comment"># Examples:</span>
+<span class="syn-comment"># encode_unsigned(0)    → b'\x00'       (1 byte)</span>
+<span class="syn-comment"># encode_unsigned(127)  → b'\x7f'       (1 byte)</span>
+<span class="syn-comment"># encode_unsigned(128)  → b'\x80\x01'   (2 bytes)</span>
+<span class="syn-comment"># encode_unsigned(624485) → b'\xe5\x8e\x26' (3 bytes)</span></pre>
+                    </div>
+                </div>
+
+                <h2>Module Structure</h2>
+                <p>A .wasm file begins with magic number + version, followed by numbered sections:</p>
+                <table class="data-table">
+                    <thead><tr><th>Section</th><th>ID</th><th>Contents</th></tr></thead>
+                    <tbody>
+                        <tr><td>Type</td><td>1</td><td>Function type signatures (param/return types)</td></tr>
+                        <tr><td>Import</td><td>2</td><td>External functions (JavaScript FFI)</td></tr>
+                        <tr><td>Function</td><td>3</td><td>Function declarations (type indices only)</td></tr>
+                        <tr><td>Memory</td><td>5</td><td>Linear memory specification (pages × 64KB)</td></tr>
+                        <tr><td>Global</td><td>6</td><td>Global variables with initializers</td></tr>
+                        <tr><td>Export</td><td>7</td><td>Names visible to JavaScript host</td></tr>
+                        <tr><td>Start</td><td>8</td><td>Entry point function index</td></tr>
+                        <tr><td>Code</td><td>10</td><td>Function bodies (locals + instructions)</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Value Type Encoding</h3>
+                <div class="opcode-grid">
+                    <div class="opcode-item"><span class="opcode-name">i32</span><span class="opcode-hex">0x7F</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i64</span><span class="opcode-hex">0x7E</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f32</span><span class="opcode-hex">0x7D</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64</span><span class="opcode-hex">0x7C</span></div>
+                </div>
+
+                <h2>Instruction Opcodes</h2>
+                <h3>Arithmetic</h3>
+                <div class="opcode-grid">
+                    <div class="opcode-item"><span class="opcode-name">i32.add</span><span class="opcode-hex">0x6A</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.sub</span><span class="opcode-hex">0x6B</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.mul</span><span class="opcode-hex">0x6C</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.div_s</span><span class="opcode-hex">0x6D</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.add</span><span class="opcode-hex">0xA0</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.sub</span><span class="opcode-hex">0xA1</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.mul</span><span class="opcode-hex">0xA2</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.div</span><span class="opcode-hex">0xA3</span></div>
+                </div>
+                <h3>Comparisons</h3>
+                <div class="opcode-grid">
+                    <div class="opcode-item"><span class="opcode-name">i32.eq</span><span class="opcode-hex">0x46</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.ne</span><span class="opcode-hex">0x47</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.lt_s</span><span class="opcode-hex">0x48</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.gt_s</span><span class="opcode-hex">0x4A</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.le_s</span><span class="opcode-hex">0x4C</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.ge_s</span><span class="opcode-hex">0x4E</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.lt</span><span class="opcode-hex">0x63</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.gt</span><span class="opcode-hex">0x64</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.le</span><span class="opcode-hex">0x65</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.ge</span><span class="opcode-hex">0x66</span></div>
+                </div>
+                <h3>Control Flow</h3>
+                <div class="opcode-grid">
+                    <div class="opcode-item"><span class="opcode-name">block</span><span class="opcode-hex">0x02</span></div>
+                    <div class="opcode-item"><span class="opcode-name">loop</span><span class="opcode-hex">0x03</span></div>
+                    <div class="opcode-item"><span class="opcode-name">if</span><span class="opcode-hex">0x04</span></div>
+                    <div class="opcode-item"><span class="opcode-name">else</span><span class="opcode-hex">0x05</span></div>
+                    <div class="opcode-item"><span class="opcode-name">end</span><span class="opcode-hex">0x0B</span></div>
+                    <div class="opcode-item"><span class="opcode-name">br</span><span class="opcode-hex">0x0C</span></div>
+                    <div class="opcode-item"><span class="opcode-name">br_if</span><span class="opcode-hex">0x0D</span></div>
+                    <div class="opcode-item"><span class="opcode-name">return</span><span class="opcode-hex">0x0F</span></div>
+                    <div class="opcode-item"><span class="opcode-name">call</span><span class="opcode-hex">0x10</span></div>
+                </div>
+                <h3>Variables & Memory</h3>
+                <div class="opcode-grid">
+                    <div class="opcode-item"><span class="opcode-name">local.get</span><span class="opcode-hex">0x20</span></div>
+                    <div class="opcode-item"><span class="opcode-name">local.set</span><span class="opcode-hex">0x21</span></div>
+                    <div class="opcode-item"><span class="opcode-name">global.get</span><span class="opcode-hex">0x23</span></div>
+                    <div class="opcode-item"><span class="opcode-name">global.set</span><span class="opcode-hex">0x24</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.load</span><span class="opcode-hex">0x28</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.load</span><span class="opcode-hex">0x2B</span></div>
+                    <div class="opcode-item"><span class="opcode-name">i32.store</span><span class="opcode-hex">0x36</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.store</span><span class="opcode-hex">0x39</span></div>
+                </div>
+                <h3>Constants</h3>
+                <div class="opcode-grid">
+                    <div class="opcode-item"><span class="opcode-name">i32.const</span><span class="opcode-hex">0x41 + LEB128</span></div>
+                    <div class="opcode-item"><span class="opcode-name">f64.const</span><span class="opcode-hex">0x44 + 8 bytes</span></div>
+                </div>
+
+                <h2>Wasm Loop Encoding</h2>
+                <p>Loops require an outer block for break targets:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">wasm_loop.txt</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-opcode">block</span> {              <span class="syn-comment">// Outer block for break target</span>
+  <span class="syn-opcode">loop</span> {             <span class="syn-comment">// Inner loop for continue target</span>
+    ... evaluate test ...
+    <span class="syn-opcode">br_if</span> <span class="syn-number">1</span>          <span class="syn-comment">// Break to enclosing block if true</span>
+    ... loop body ...
+    <span class="syn-opcode">br</span> <span class="syn-number">0</span>             <span class="syn-comment">// Jump back to loop start</span>
+  }
+  <span class="syn-comment">// br_if 1 targets here</span>
+}</pre>
+                    </div>
+                </div>
+
+                <div class="highlight-box orange">
+                    <div class="highlight-box-title">No Text Names in Wasm</div>
+                    <p>Everything in WebAssembly uses numeric indices—no strings! Functions, locals, globals, and types are all referenced by index. The compiler must maintain mapping tables from names to indices during code generation.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- LLVM Deep Dive -->
+        <section class="section deep-dive llvm" id="llvm">
+            <div class="section-header">
+                <p class="section-eyebrow">Deep Dive</p>
+                <h2 class="section-title">LLVM Code Generation</h2>
+                <p class="section-subtitle">High-performance native code via llvmlite.</p>
+            </div>
+            <div class="article">
+                <h2>LLVM Architecture</h2>
+                <p>LLVM is a modular compiler infrastructure that provides a target-independent intermediate representation. The same IR can compile to x86, ARM, RISC-V, or WebAssembly.</p>
+                <div class="highlight-box red">
+                    <div class="highlight-box-title">Key Concepts</div>
+                    <p><strong>SSA Form:</strong> Static Single Assignment—each variable is assigned exactly once. This enables powerful optimizations like constant propagation and dead code elimination.</p>
+                    <p><strong>Basic Blocks:</strong> Sequences of instructions with single entry and exit points, connected by explicit branch instructions.</p>
+                    <p><strong>Not a Stack Machine:</strong> Unlike our IR, LLVM uses registers. Operations produce new temporaries that must be explicitly stored.</p>
+                </div>
+
+                <h2>LLVM Module Setup</h2>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">llvm_setup.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">from</span> llvmlite.ir <span class="syn-keyword">import</span> (
+    Module, Function, FunctionType, IRBuilder,
+    IntType, DoubleType, VoidType, Constant
+)
+
+<span class="syn-comment"># Create module and types</span>
+mod = Module(<span class="syn-string">'mycompiler'</span>)
+int_type = IntType(<span class="syn-number">32</span>)      <span class="syn-comment"># i32</span>
+float_type = DoubleType()   <span class="syn-comment"># f64</span>
+void_type = VoidType()
+
+<span class="syn-comment"># Declare a function: int hello()</span>
+hello_func = Function(mod, 
+    FunctionType(int_type, []), 
+    name=<span class="syn-string">'hello'</span>)
+
+<span class="syn-comment"># Add a basic block and builder</span>
+block = hello_func.append_basic_block(<span class="syn-string">'entry'</span>)
+builder = IRBuilder(block)
+
+<span class="syn-comment"># Return a constant</span>
+builder.ret(Constant(int_type, <span class="syn-number">42</span>))</pre>
+                    </div>
+                </div>
+
+                <h2>Stack-to-SSA Translation</h2>
+                <p>The core challenge: translating stack-based IR to SSA form. A value stack tracks intermediate LLVM values:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">llvm_codegen.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">class</span> <span class="syn-type">GenerateLLVM</span>:
+    <span class="syn-keyword">def</span> <span class="syn-function">__init__</span>(self):
+        self.stack = []        <span class="syn-comment"># LLVM value stack</span>
+        self.locals = {}       <span class="syn-comment"># Local variable pointers</span>
+        self.globals = {}      <span class="syn-comment"># Global variable pointers</span>
+        self.block_stack = []  <span class="syn-comment"># Control flow blocks</span>
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">push</span>(self, value):
+        self.stack.append(value)
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">pop</span>(self):
+        <span class="syn-keyword">return</span> self.stack.pop()
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">emit_ADDI</span>(self):
+        right = self.pop()
+        left = self.pop()
+        result = self.builder.add(left, right)  <span class="syn-comment"># SSA!</span>
+        self.push(result)
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">emit_MULI</span>(self):
+        right = self.pop()
+        left = self.pop()
+        self.push(self.builder.mul(left, right))
+    
+    <span class="syn-keyword">def</span> <span class="syn-function">emit_ADDF</span>(self):
+        right = self.pop()
+        left = self.pop()
+        self.push(self.builder.fadd(left, right))  <span class="syn-comment"># Float add</span></pre>
+                    </div>
+                </div>
+
+                <h2>Variable Storage</h2>
+                <p>Local variables use <code>alloca</code> for stack slots. Globals use <code>GlobalVariable</code>:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">variables.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">from</span> llvmlite.ir <span class="syn-keyword">import</span> GlobalVariable
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_VARI</span>(self, name):
+    <span class="syn-string">'''Declare local integer variable.'''</span>
+    self.locals[name] = self.builder.alloca(int_type, name=name)
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_GLOBALI</span>(self, name):
+    <span class="syn-string">'''Declare global integer variable.'''</span>
+    var = GlobalVariable(self.module, int_type, name=name)
+    var.initializer = Constant(int_type, <span class="syn-number">0</span>)
+    self.globals[name] = var
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_LOAD</span>(self, name):
+    <span class="syn-string">'''Load variable onto stack.'''</span>
+    ptr = self.locals.get(name) <span class="syn-keyword">or</span> self.globals.get(name)
+    self.push(self.builder.load(ptr, name))
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_STORE</span>(self, name):
+    <span class="syn-string">'''Store top of stack to variable.'''</span>
+    ptr = self.locals.get(name) <span class="syn-keyword">or</span> self.globals.get(name)
+    self.builder.store(self.pop(), ptr)</pre>
+                    </div>
+                </div>
+
+                <h2>Comparison Operations</h2>
+                <p>LLVM comparisons return <code>i1</code> (1-bit bool). Zero-extend to <code>i32</code> for stack compatibility:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">comparisons.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">def</span> <span class="syn-function">emit_LTI</span>(self):
+    <span class="syn-string">'''Integer less-than comparison.'''</span>
+    right = self.pop()
+    left = self.pop()
+    <span class="syn-comment"># icmp returns i1 (1-bit bool)</span>
+    result = self.builder.icmp_signed(<span class="syn-string">'<'</span>, left, right)
+    <span class="syn-comment"># Zero-extend i1 → i32 for stack</span>
+    self.push(self.builder.zext(result, IntType(<span class="syn-number">32</span>)))
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_LTF</span>(self):
+    <span class="syn-string">'''Float less-than comparison.'''</span>
+    right = self.pop()
+    left = self.pop()
+    result = self.builder.fcmp_ordered(<span class="syn-string">'<'</span>, left, right)
+    self.push(self.builder.zext(result, IntType(<span class="syn-number">32</span>)))
+
+<span class="syn-comment"># Available comparisons:</span>
+<span class="syn-comment"># icmp_signed: '<', '<=', '>', '>=', '==', '!='</span>
+<span class="syn-comment"># fcmp_ordered: '<', '<=', '>', '>=', '==', '!='</span></pre>
+                    </div>
+                </div>
+
+                <h2>Control Flow with Basic Blocks</h2>
+                <p>Control flow creates new basic blocks. A block stack tracks branch targets:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">control_flow.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-keyword">def</span> <span class="syn-function">emit_IF</span>(self):
+    then_block = self.function.append_basic_block(<span class="syn-string">'then'</span>)
+    else_block = self.function.append_basic_block(<span class="syn-string">'else'</span>)
+    exit_block = self.function.append_basic_block(<span class="syn-string">'endif'</span>)
+    
+    <span class="syn-comment"># Truncate i32 → i1 for branch condition</span>
+    cond = self.builder.trunc(self.pop(), IntType(<span class="syn-number">1</span>))
+    self.builder.cbranch(cond, then_block, else_block)
+    self.builder.position_at_end(then_block)
+    self.block_stack.append((then_block, else_block, exit_block))
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_ELSE</span>(self):
+    _, else_block, exit_block = self.block_stack[-<span class="syn-number">1</span>]
+    self.builder.branch(exit_block)  <span class="syn-comment"># End of then-block</span>
+    self.builder.position_at_end(else_block)
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_ENDIF</span>(self):
+    _, _, exit_block = self.block_stack.pop()
+    self.builder.branch(exit_block)
+    self.builder.position_at_end(exit_block)
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_LOOP</span>(self):
+    loop_block = self.function.append_basic_block(<span class="syn-string">'loop'</span>)
+    exit_block = self.function.append_basic_block(<span class="syn-string">'endloop'</span>)
+    self.builder.branch(loop_block)
+    self.builder.position_at_end(loop_block)
+    self.block_stack.append((loop_block, exit_block))</pre>
+                    </div>
+                </div>
+
+                <h2>External Function Calls</h2>
+                <p>I/O and runtime functions are implemented in C and linked:</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span></div>
+                        <span class="code-filename">runtime.py</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="syn-comment"># Declare external C function: void _print_int(int x)</span>
+_print_int = Function(mod,
+    FunctionType(void_type, [int_type]),
+    name=<span class="syn-string">'_print_int'</span>)
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_PRINTI</span>(self):
+    self.builder.call(_print_int, [self.pop()])
+
+<span class="syn-keyword">def</span> <span class="syn-function">emit_CALL</span>(self, name):
+    func = self.globals[name]
+    <span class="syn-comment"># Pop args in reverse order</span>
+    args = [self.pop() <span class="syn-keyword">for</span> _ <span class="syn-keyword">in</span> range(len(func.args))][::-<span class="syn-number">1</span>]
+    result = self.builder.call(func, args)
+    self.push(result)</pre>
+                    </div>
+                </div>
+                
+                <div class="highlight-box red">
+                    <div class="highlight-box-title">Every Block Must Terminate</div>
+                    <p>LLVM requires every basic block to end with a terminator instruction (<code>ret</code>, <code>br</code>, or <code>cbranch</code>). Forgetting this causes cryptic errors. Also, you cannot add instructions after a terminator—they're unreachable.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture Section -->
+        <section class="section" id="architecture">
+            <div class="section-header">
+                <p class="section-eyebrow">Compiler Phases</p>
+                <h2 class="section-title">Multi-Phase Architecture</h2>
+                <p class="section-subtitle">Nine project phases building a complete compiler pipeline.</p>
+            </div>
+            <div class="arch-grid">
+                <div class="arch-card lexer">
+                    <div class="arch-icon">📝</div>
+                    <h3 class="arch-title">1. Lexical Analysis</h3>
+                    <p class="arch-desc">Tokenization using SLY framework. Recognizes keywords, identifiers, literals (int, float, char with escape codes), operators, and handles comments. Tracks line numbers for error reporting.</p>
+                </div>
+                <div class="arch-card parser">
+                    <div class="arch-icon">🌳</div>
+                    <h3 class="arch-title">2. Syntax Parsing</h3>
+                    <p class="arch-desc">LALR(1) parser generating typed Abstract Syntax Trees. Enforces operator precedence, associativity, and non-associativity for relational operators.</p>
+                </div>
+                <div class="arch-card checker">
+                    <div class="arch-icon">✓</div>
+                    <h3 class="arch-title">3. Type Checking</h3>
+                    <p class="arch-desc">Semantic validation with two-level symbol tables (global/local). Type compatibility, undefined reference detection, function signature validation.</p>
+                </div>
+                <div class="arch-card ir">
+                    <div class="arch-icon">⚙️</div>
+                    <h3 class="arch-title">4. IR Generation</h3>
+                    <p class="arch-desc">Stack-based intermediate representation with typed opcodes. Target-independent code enabling multiple backends.</p>
+                </div>
+                <div class="arch-card interp">
+                    <div class="arch-icon">▶️</div>
+                    <h3 class="arch-title">5. Interpreter</h3>
+                    <p class="arch-desc">Direct IR execution for rapid development. Stack-based VM with simulated memory, call frames, and control flow.</p>
+                </div>
+                <div class="arch-card llvm">
+                    <div class="arch-icon">🔧</div>
+                    <h3 class="arch-title">6-7. LLVM Backend</h3>
+                    <p class="arch-desc">Native code via llvmlite. SSA form, basic blocks, comparison with zero-extension, C runtime integration.</p>
+                </div>
+                <div class="arch-card wasm">
+                    <div class="arch-icon">🌐</div>
+                    <h3 class="arch-title">8. WebAssembly</h3>
+                    <p class="arch-desc">Direct binary .wasm encoding. LEB128, module sections, type signatures, JavaScript FFI.</p>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <a href="https://sampooni.github.io/Profile/#research" target="_blank" class="footer-author">
+                <span class="footer-avatar">SVP</span>
+                <span class="footer-info">
+                    <span class="footer-name">Subramaniyam Venkata Pooni</span>
+                    <span class="footer-role">Chief Architect, CS²B Technologies</span>
+                </span>
+            </a>
+            <div class="footer-links">
+                <a href="research.html" class="footer-link">All Research</a>
+                <a href="index.html" class="footer-link">Company</a>
+                <a href="https://sampooni.github.io/Profile/" target="_blank" class="footer-link">Portfolio</a>
+            </div>
+            <p class="footer-copy">© 2020 CSSQUAREDB Technologies Inc. All rights reserved.</p>
+        </footer>
+    </div>
+    <script>
+        document.querySelectorAll('a[href^="#"]').forEach(a => {
+            a.addEventListener('click', e => {
+                e.preventDefault();
+                document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+</html>
