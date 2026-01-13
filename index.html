@@ -194,7 +194,7 @@
             transform: translateX(-50%);
             background: rgba(10, 10, 20, 0.95);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(0, 212, 255, 0.2);
+            border: 1px solid rgba(48, 209, 88, 0.3);
             border-radius: 12px;
             padding: 10px 0;
             min-width: 180px;
@@ -202,7 +202,7 @@
             visibility: hidden;
             transition: all 0.3s ease;
             margin-top: 15px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(48, 209, 88, 0.1);
             list-style: none;
             z-index: 1000;
         }
@@ -215,7 +215,7 @@
             transform: translateX(-50%);
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-bottom: 8px solid rgba(0, 212, 255, 0.2);
+            border-bottom: 8px solid rgba(48, 209, 88, 0.3);
         }
 
         .nav-dropdown:hover .dropdown-menu {
@@ -224,27 +224,77 @@
             margin-top: 10px;
         }
 
-        .dropdown-menu li {
-            padding: 0;
-        }
-
-        .dropdown-menu a {
-            display: block;
-            padding: 10px 20px;
-            color: var(--text-dim) !important;
-            font-size: 0.8rem !important;
-            text-transform: none !important;
-            letter-spacing: 0.5px !important;
-            white-space: nowrap;
-        }
-
-        .dropdown-menu a:hover {
-            background: rgba(0, 212, 255, 0.1);
-            color: var(--cyan) !important;
-        }
-
         .dropdown-menu a::after {
             display: none !important;
+        }
+
+        /* Download Panel Styles */
+        .download-panel {
+            min-width: 520px !important;
+            padding: 20px !important;
+            text-align: center;
+        }
+
+        .download-header {
+            color: #30d158;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 3px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 0.7rem !important;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase !important;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border: 2px solid;
+            min-width: 180px;
+            text-align: center;
+        }
+
+        .download-btn-cyan {
+            background: transparent;
+            border-color: #30d158;
+            color: #30d158 !important;
+        }
+
+        .download-btn-cyan:hover {
+            background: #30d158;
+            color: #000 !important;
+            box-shadow: 0 0 20px #30d158;
+        }
+
+        .download-btn-magenta {
+            background: transparent;
+            border-color: #30d158;
+            color: #30d158 !important;
+        }
+
+        .download-btn-magenta:hover {
+            background: #30d158;
+            color: #000 !important;
+            box-shadow: 0 0 20px #30d158;
+        }
+
+        .download-icon {
+            font-size: 1rem;
         }
 
         /* Hero Section */
@@ -1297,12 +1347,23 @@
             <ul class="nav-links">
                 <li class="nav-dropdown">
                     <a href="#">Resume ▾</a>
-                    <ul class="dropdown-menu">
-                        <li><a href="sv-pooni-resume.pdf" target="_blank">📄 Resume (PDF)</a></li>
-                        <li><a href="sv-pooni-resume.docx" target="_blank">📝 Resume (Word)</a></li>
-                        <li><a href="sv-pooni-cover-letter.pdf" target="_blank">✉️ Cover Letter (PDF)</a></li>
-                        <li><a href="sv-pooni-cover-letter.docx" target="_blank">✉️ Cover Letter (Word)</a></li>
-                    </ul>
+                    <div class="dropdown-menu download-panel">
+                        <div class="download-header">📁 DOWNLOAD DOCUMENTS</div>
+                        <div class="download-buttons">
+                            <a href="sv-pooni-resume.pdf" target="_blank" class="download-btn download-btn-cyan">
+                                <span class="download-icon">📄</span> RESUME (PDF)
+                            </a>
+                            <a href="sv-pooni-resume.docx" target="_blank" class="download-btn download-btn-cyan">
+                                <span class="download-icon">📄</span> RESUME (DOCX)
+                            </a>
+                            <a href="sv-pooni-cover-letter.pdf" target="_blank" class="download-btn download-btn-magenta">
+                                <span class="download-icon">✉️</span> COVER LETTER (PDF)
+                            </a>
+                            <a href="sv-pooni-cover-letter.docx" target="_blank" class="download-btn download-btn-magenta">
+                                <span class="download-icon">📄</span> COVER LETTER (DOCX)
+                            </a>
+                        </div>
+                    </div>
                 </li>
                 <li><a href="#company">Company</a></li>
                 <li><a href="#experience">Experience</a></li>
